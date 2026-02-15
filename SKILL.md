@@ -1,5 +1,5 @@
 ---
-name: polymarket
+name: holo-polymarket
 description: Polymarket 预测市场工具。查询热门预测、搜索市场、分析概率趋势、追踪大户持仓。
 homepage: https://github.com/helebest/holo-polymarket
 ---
