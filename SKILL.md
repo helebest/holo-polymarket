@@ -1,12 +1,12 @@
 ---
 name: polymarket
-description: Polymarket 预测市场查询。查看热门预测、搜索市场、获取事件详情和概率。
+description: Polymarket 预测市场工具。查询热门预测、搜索市场、分析概率趋势、追踪大户持仓。
 homepage: https://github.com/helebest/holo-polymarket
 ---
 
 # Polymarket
 
-查询 Polymarket 预测市场数据，包括热门事件、搜索和详情。
+一站式接入 Polymarket 预测市场 — 查询、分析、交易。
 
 ## 前置条件
 
