@@ -37,7 +37,9 @@ format_hot_events() {
         .value |
         "\($i + 1). \(.title)" ,
         (
-            if (.markets | length) <= 4 then
+            if (.markets // [] | length) == 0 then
+                "   (无市场数据)"
+            elif (.markets | length) <= 4 then
                 .markets[] |
                 "   \(.groupItemTitle // .question): \(
                     if .outcomePrices then
@@ -46,7 +48,7 @@ format_hot_events() {
                     end
                 )"
             else
-                (.markets | sort_by(- (.outcomePrices | fromjson | .[0] | tonumber)) | .[0:3][] |
+                (.markets | map(select(.outcomePrices != null)) | sort_by(- (.outcomePrices | fromjson | .[0] | tonumber)) | .[0:3][] |
                 "   \(.groupItemTitle // .question): \(
                     (.outcomePrices | fromjson | .[0] | tonumber * 100 | . * 10 | round / 10 | tostring) + "%"
                 )") ,
