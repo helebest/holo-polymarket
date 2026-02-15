@@ -203,7 +203,7 @@ format_trades() {
         " | \(.title)" +
         (if .outcome then " [\(.outcome)]" else "" end),
         "   💵 数量: \(.size // 0 | . * 100 | round / 100) @ $\(.price // 0 | . * 10000 | round / 10000)" +
-        " | 🕐 \(.timestamp // 0 | todate | split("T") | .[0])",
+        " | 🕐 \(.timestamp // 0 | todate | split("T") | .[0] + " " + (.[1] | split("Z") | .[0] | .[0:5]) + " UTC")",
         ""
     '
 }

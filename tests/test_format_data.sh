@@ -132,8 +132,9 @@ echo "[Test 9] format_trades - empty trades"
 EMPTY_OUTPUT=$(echo '[]' | format_trades)
 assert_contains "empty message" "暂无交易" "$EMPTY_OUTPUT"
 
-echo "[Test 10] format_trades - shows time"
+echo "[Test 10] format_trades - shows time with hours"
 assert_contains "shows date" "2025" "$OUTPUT"
+assert_contains "shows UTC time" "UTC" "$OUTPUT"
 
 # ==================== format_pnl helper ====================
 
