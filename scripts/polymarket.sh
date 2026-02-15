@@ -48,20 +48,62 @@ case "$CMD" in
             echo "$RESULT" | format_event_detail
         fi
         ;;
+    leaderboard|lb)
+        LIMIT="${1:-10}"
+        ORDER="${2:-pnl}"
+        if [ "$ORDER" = "vol" ] || [ "$ORDER" = "volume" ]; then
+            echo "🏆 Polymarket 排行榜 (按交易量, Top ${LIMIT})"
+            ORDER="vol"
+        else
+            echo "🏆 Polymarket 排行榜 (按盈利, Top ${LIMIT})"
+            ORDER="pnl"
+        fi
+        echo ""
+        fetch_leaderboard "$LIMIT" "$ORDER" | format_leaderboard
+        ;;
+    positions|pos)
+        ADDR="$1"
+        LIMIT="${2:-10}"
+        if [ -z "$ADDR" ]; then
+            echo "用法: bash polymarket.sh positions <钱包地址> [limit]"
+            exit 1
+        fi
+        echo "📊 持仓查询: $(format_address "$ADDR")"
+        echo ""
+        fetch_positions "$ADDR" "$LIMIT" | format_positions
+        ;;
+    trades)
+        ADDR="$1"
+        LIMIT="${2:-10}"
+        if [ -z "$ADDR" ]; then
+            echo "用法: bash polymarket.sh trades <钱包地址> [limit]"
+            exit 1
+        fi
+        echo "📜 交易记录: $(format_address "$ADDR")"
+        echo ""
+        fetch_trades "$ADDR" "$LIMIT" | format_trades
+        ;;
     *)
-        echo "Holo Polymarket - 预测市场查询"
+        echo "Holo Polymarket - 预测市场工具"
         echo ""
         echo "用法: bash polymarket.sh <command> [args...]"
         echo ""
         echo "命令:"
-        echo "  hot [limit]              查看热门预测（默认5条）"
-        echo "  search <关键词> [limit]  搜索预测市场"
-        echo "  detail <event-slug>      查看事件详情"
+        echo "  hot [limit]                    查看热门预测（默认5条）"
+        echo "  search <关键词> [limit]        搜索预测市场"
+        echo "  detail <event-slug>            查看事件详情"
+        echo "  leaderboard [limit] [pnl|vol]  查看排行榜（默认按盈利）"
+        echo "  positions <地址> [limit]       查看用户持仓"
+        echo "  trades <地址> [limit]          查看用户交易记录"
+        echo ""
+        echo "别名: lb = leaderboard, pos = positions"
         echo ""
         echo "示例:"
         echo "  bash polymarket.sh hot 3"
         echo "  bash polymarket.sh search bitcoin"
-        echo "  bash polymarket.sh detail fed-decision-in-march-885"
+        echo "  bash polymarket.sh lb 5 vol"
+        echo "  bash polymarket.sh positions 0xc257ea7e...358e 10"
+        echo "  bash polymarket.sh trades 0xc257ea7e...358e 5"
         exit 1
         ;;
 esac
