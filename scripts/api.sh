@@ -5,6 +5,8 @@
 
 GAMMA_API="${GAMMA_API_BASE:-https://gamma-api.polymarket.com}"
 CURL_TIMEOUT="${CURL_TIMEOUT:-15}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/cache.sh"
 
 # 通用 GET 请求
 # 用法: gamma_get "/events" "limit=5&active=true"
@@ -142,6 +144,7 @@ fetch_price_history() {
     local from_date="$2"
     local to_date="$3"
     local interval="${4:-1d}"
+    local params key cached response
 
     if [ -z "$slug" ]; then
         echo "[]"
@@ -156,8 +159,17 @@ fetch_price_history() {
         return 1
     }
 
+    params="slug=${slug}&from=${from_date}&to=${to_date}&interval=${interval}"
+    key=$(cache_key "history-price" "$DATA_API" "$params")
+    if cached=$(cache_get "$key"); then
+        echo "$cached"
+        return 0
+    fi
+
     # API skeleton: 统一通过 data-api 获取历史价格
-    data_get "/history/prices" "slug=${slug}&from=${from_date}&to=${to_date}&interval=${interval}"
+    response=$(data_get "/history/prices" "$params")
+    cache_set "$key" "$response" "${CACHE_TTL:-60}" >/dev/null 2>&1
+    echo "$response"
 }
 
 # 获取交易量历史数据
@@ -167,6 +179,7 @@ fetch_volume_history() {
     local from_date="$2"
     local to_date="$3"
     local interval="${4:-1d}"
+    local params key cached response
 
     if [ -z "$slug" ]; then
         echo "[]"
@@ -181,8 +194,17 @@ fetch_volume_history() {
         return 1
     }
 
+    params="slug=${slug}&from=${from_date}&to=${to_date}&interval=${interval}"
+    key=$(cache_key "history-volume" "$DATA_API" "$params")
+    if cached=$(cache_get "$key"); then
+        echo "$cached"
+        return 0
+    fi
+
     # API skeleton: 统一通过 data-api 获取历史交易量
-    data_get "/history/volume" "slug=${slug}&from=${from_date}&to=${to_date}&interval=${interval}"
+    response=$(data_get "/history/volume" "$params")
+    cache_set "$key" "$response" "${CACHE_TTL:-60}" >/dev/null 2>&1
+    echo "$response"
 }
 
 # 统一历史序列查询入口
