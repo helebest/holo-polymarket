@@ -25,7 +25,7 @@ assert_eq() {
 
 assert_contains() {
     local desc="$1" expected="$2" actual="$3"
-    if printf '%s' "$actual" | grep -Fq "$expected"; then
+    if printf '%s' "$actual" | grep -Fq -- "$expected"; then
         echo "  ✅ $desc"
         PASS=$((PASS + 1))
     else
@@ -71,6 +71,18 @@ OUT=$(bash "$PROJECT_DIR/scripts/polymarket.sh" volume-trend test-slug 2025-01-0
 CODE=$?
 assert_status "volume-trend invalid interval exits 1" 1 "$CODE"
 assert_contains "volume-trend invalid interval message" "interval 无效" "$OUT"
+
+echo "[Test 3.1] history 导出 format 参数校验"
+OUT=$(bash "$PROJECT_DIR/scripts/polymarket.sh" history test-slug 2025-01-01 2025-01-02 --format xml 2>&1)
+CODE=$?
+assert_status "history invalid format exits 1" 1 "$CODE"
+assert_contains "history invalid format message" "format 无效" "$OUT"
+
+echo "[Test 3.2] trend 导出 out 参数依赖校验"
+OUT=$(bash "$PROJECT_DIR/scripts/polymarket.sh" trend test-slug 2025-01-01 2025-01-02 --out /tmp/out.csv 2>&1)
+CODE=$?
+assert_status "trend out without format exits 1" 1 "$CODE"
+assert_contains "trend out without format message" "--out 需要与 --format 一起使用" "$OUT"
 
 # API validation tests
 
