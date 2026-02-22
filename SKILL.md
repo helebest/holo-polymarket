@@ -41,6 +41,29 @@ bash {baseDir}/scripts/polymarket.sh positions <钱包地址> [limit]
 bash {baseDir}/scripts/polymarket.sh trades <钱包地址> [limit]
 ```
 
+### 历史与趋势分析（Phase 2b）
+
+```bash
+# 历史价格（默认 interval=1d）
+bash {baseDir}/scripts/polymarket.sh history <event-slug> <from> <to> [interval]
+
+# 概率趋势（起始/结束/变化）
+bash {baseDir}/scripts/polymarket.sh trend <event-slug> <from> <to> [interval]
+
+# 交易量趋势
+bash {baseDir}/scripts/polymarket.sh volume-trend <event-slug> <from> <to> [interval]
+```
+
+时间范围参数：
+- `from`: 开始日期（`YYYY-MM-DD`）
+- `to`: 结束日期（`YYYY-MM-DD`）
+- `interval`: `1h` / `4h` / `1d`（默认 `1d`）
+- CLI 中为位置参数 `<from> <to> [interval]`，语义等同 `--from` / `--to` / `--interval`
+
+导出参数：
+- `--format csv|json`
+- `--out <文件路径>`（必须与 `--format` 一起使用）
+
 ## 示例
 
 ```bash
@@ -61,6 +84,15 @@ bash {baseDir}/scripts/polymarket.sh pos 0xc257ea7e3a81ca8e16df8935d44d513959fa3
 
 # 查看大户交易记录
 bash {baseDir}/scripts/polymarket.sh trades 0xc257ea7e3a81ca8e16df8935d44d513959fa358e 5
+
+# 历史价格（按天）
+bash {baseDir}/scripts/polymarket.sh history fed-decision-in-march-885 2025-01-01 2025-01-31 1d
+
+# 概率趋势（按4小时）
+bash {baseDir}/scripts/polymarket.sh trend fed-decision-in-march-885 2025-01-01 2025-01-31 4h
+
+# 交易量趋势并导出 CSV
+bash {baseDir}/scripts/polymarket.sh volume-trend fed-decision-in-march-885 2025-01-01 2025-01-31 --format csv --out /tmp/volume.csv
 ```
 
 ## 别名
@@ -74,3 +106,19 @@ bash {baseDir}/scripts/polymarket.sh trades 0xc257ea7e3a81ca8e16df8935d44d513959
 2. `positions <地址>` 查看大户当前押注了什么
 3. `trades <地址>` 查看大户最近交易动向
 4. `detail <slug>` 深入了解某个预测市场
+5. `history/trend/volume-trend` 复盘价格与交易量变化
+
+## 缓存
+
+历史类请求默认使用本地缓存（默认 TTL 60 秒）：
+
+```bash
+# 禁用缓存（单次）
+NO_CACHE=1 bash {baseDir}/scripts/polymarket.sh history fed-decision-in-march-885 2025-01-01 2025-01-31
+
+# 查看缓存统计
+bash -c 'source {baseDir}/scripts/cache.sh && cache_stats'
+
+# 清理缓存
+bash -c 'source {baseDir}/scripts/cache.sh && cache_clear'
+```

@@ -43,7 +43,73 @@ bash scripts/polymarket.sh positions <钱包地址> [limit]
 
 # 查看用户交易记录
 bash scripts/polymarket.sh trades <钱包地址> [limit]
+
+# 历史价格（默认 interval=1d）
+bash scripts/polymarket.sh history <event-slug> <from> <to> [interval]
+
+# 概率趋势（汇总起始/结束/变化）
+bash scripts/polymarket.sh trend <event-slug> <from> <to> [interval]
+
+# 交易量趋势
+bash scripts/polymarket.sh volume-trend <event-slug> <from> <to> [interval]
 ```
+
+## Phase 2b：历史数据与趋势分析
+
+### 新增命令
+
+```bash
+# 历史价格表格
+bash scripts/polymarket.sh history fed-decision-in-march-885 2025-01-01 2025-01-31 1d
+
+# 概率趋势汇总（支持 1h / 4h / 1d）
+bash scripts/polymarket.sh trend fed-decision-in-march-885 2025-01-01 2025-01-31 4h
+
+# 交易量趋势表格
+bash scripts/polymarket.sh volume-trend fed-decision-in-march-885 2025-01-01 2025-01-31 1d
+```
+
+### 时间范围参数
+
+- `from`: 开始日期，格式 `YYYY-MM-DD`
+- `to`: 结束日期，格式 `YYYY-MM-DD`
+- `interval`: 采样间隔，仅支持 `1h` / `4h` / `1d`，默认 `1d`
+- 在 CLI 中对应位置参数：`<from> <to> [interval]`（语义等同于 `--from` / `--to` / `--interval`）
+
+### 导出功能
+
+支持在 `history` / `trend` / `volume-trend` 中导出结果：
+
+```bash
+# 导出 CSV（自动文件名）
+bash scripts/polymarket.sh history fed-decision-in-march-885 2025-01-01 2025-01-31 --format csv
+
+# 导出 JSON（指定输出路径）
+bash scripts/polymarket.sh trend fed-decision-in-march-885 2025-01-01 2025-01-31 1d --format json --out /tmp/trend.json
+```
+
+- `--format`: `csv` 或 `json`
+- `--out`: 输出文件路径（仅可与 `--format` 一起使用）
+
+### 缓存功能
+
+历史序列请求默认启用本地缓存（默认 TTL 为 60 秒）。
+
+```bash
+# 关闭缓存（本次命令）
+NO_CACHE=1 bash scripts/polymarket.sh history fed-decision-in-march-885 2025-01-01 2025-01-31
+
+# 查看缓存统计
+bash -c 'source scripts/cache.sh && cache_stats'
+
+# 清空缓存
+bash -c 'source scripts/cache.sh && cache_clear'
+```
+
+可选环境变量：
+- `NO_CACHE=1`：禁用读写缓存
+- `CACHE_TTL=<秒>`：自定义缓存过期时间
+- `CACHE_DIR=<目录>`：自定义缓存目录（默认 `~/.cache/holo-polymarket`）
 
 ## API
 
@@ -94,11 +160,11 @@ bash tests/run_tests.sh
 
 基于 Data API
 
-- [ ] 历史价格查询（按时间段）
-- [ ] 概率趋势变化（日/周/月）
-- [ ] 交易量趋势分析
-- [ ] 数据导出（CSV/JSON）
-- [ ] 本地缓存（减少 API 调用）
+- [x] 历史价格查询（按时间段）
+- [x] 概率趋势变化（日/周/月）
+- [x] 交易量趋势分析
+- [x] 数据导出（CSV/JSON）
+- [x] 本地缓存（减少 API 调用）
 
 ### 🔮 Phase 3 — 交易下单
 
