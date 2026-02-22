@@ -102,7 +102,9 @@ case "$CMD" in
         fi
         echo "🕒 历史价格: ${SLUG} | ${FROM_DATE} -> ${TO_DATE} | ${INTERVAL}"
         echo ""
-        fetch_history_series "price" "$SLUG" "$FROM_DATE" "$TO_DATE" "$INTERVAL"
+        RESULT=$(fetch_history_series "price" "$SLUG" "$FROM_DATE" "$TO_DATE" "$INTERVAL")
+        echo "$RESULT" | format_price_history_table
+        [ "${PIPESTATUS[1]}" -eq 0 ] || exit 1
         ;;
     trend)
         SLUG="$1"
@@ -123,7 +125,9 @@ case "$CMD" in
         fi
         echo "📈 概率趋势: ${SLUG} | ${FROM_DATE} -> ${TO_DATE} | ${INTERVAL}"
         echo ""
-        fetch_history_series "price" "$SLUG" "$FROM_DATE" "$TO_DATE" "$INTERVAL"
+        RESULT=$(fetch_history_series "price" "$SLUG" "$FROM_DATE" "$TO_DATE" "$INTERVAL")
+        echo "$RESULT" | format_trend_summary
+        [ "${PIPESTATUS[1]}" -eq 0 ] || exit 1
         ;;
     volume-trend)
         SLUG="$1"
@@ -144,7 +148,9 @@ case "$CMD" in
         fi
         echo "📊 交易量趋势: ${SLUG} | ${FROM_DATE} -> ${TO_DATE} | ${INTERVAL}"
         echo ""
-        fetch_history_series "volume" "$SLUG" "$FROM_DATE" "$TO_DATE" "$INTERVAL"
+        RESULT=$(fetch_history_series "volume" "$SLUG" "$FROM_DATE" "$TO_DATE" "$INTERVAL")
+        echo "$RESULT" | format_volume_trend_table
+        [ "${PIPESTATUS[1]}" -eq 0 ] || exit 1
         ;;
     *)
         echo "Holo Polymarket - 预测市场工具"

@@ -207,3 +207,146 @@ format_trades() {
         ""
     '
 }
+
+# 将时间戳/日期值格式化为 YYYY-MM-DD
+_format_series_date() {
+    local raw="$1"
+    if [ -z "$raw" ] || [ "$raw" = "null" ]; then
+        echo "N/A"
+        return
+    fi
+
+    if echo "$raw" | grep -Eq '^[0-9]+$'; then
+        local ts="$raw"
+        if [ "$ts" -gt 9999999999 ] 2>/dev/null; then
+            ts=$((ts / 1000))
+        fi
+        date -u -d "@$ts" +%Y-%m-%d 2>/dev/null || echo "N/A"
+        return
+    fi
+
+    if echo "$raw" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}'; then
+        echo "${raw:0:10}"
+        return
+    fi
+
+    echo "N/A"
+}
+
+# 格式化历史价格表格
+# 输入: JSON 数组（每项至少包含 timestamp/date 和 price/value）
+format_price_history_table() {
+    local input
+    input=$(cat)
+
+    if ! echo "$input" | jq -e 'type == "array"' >/dev/null 2>&1; then
+        echo "数据格式无效"
+        return 1
+    fi
+
+    local len
+    len=$(echo "$input" | jq 'length')
+    if [ "$len" -eq 0 ]; then
+        echo "暂无历史价格数据"
+        return 0
+    fi
+
+    printf "%-12s | %-8s\n" "日期" "概率"
+    printf -- "-------------+----------\n"
+    echo "$input" | jq -r '
+        .[] |
+        [
+            (.timestamp // .time // .ts // .date // .datetime // ""),
+            (.price // .value // .close // .p // "")
+        ] | @tsv
+    ' | while IFS=$'\t' read -r raw_time raw_price; do
+        local day prob
+        day=$(_format_series_date "$raw_time")
+        prob=$(format_prob "$raw_price")
+        printf "%-12s | %-8s\n" "$day" "$prob"
+    done
+}
+
+# 格式化趋势摘要（起始/结束/绝对变化/相对变化）
+# 输入: JSON 数组（按时间顺序）
+format_trend_summary() {
+    local input
+    input=$(cat)
+
+    if ! echo "$input" | jq -e 'type == "array"' >/dev/null 2>&1; then
+        echo "数据格式无效"
+        return 1
+    fi
+
+    local len
+    len=$(echo "$input" | jq 'length')
+    if [ "$len" -eq 0 ]; then
+        echo "暂无趋势数据"
+        return 0
+    fi
+
+    local values_json
+    values_json=$(echo "$input" | jq -c '[ .[] | (.price // .value // .close // .p // empty) ]')
+    if [ "$(echo "$values_json" | jq 'length')" -eq 0 ]; then
+        echo "暂无趋势数据"
+        return 0
+    fi
+
+    local start end
+    start=$(echo "$values_json" | jq -r '.[0]')
+    end=$(echo "$values_json" | jq -r '.[-1]')
+
+    local start_fmt end_fmt abs_change rel_change
+    start_fmt=$(format_prob "$start")
+    end_fmt=$(format_prob "$end")
+    abs_change=$(awk -v s="$start" -v e="$end" 'BEGIN {
+        d = (e - s) * 100
+        if (d >= 0) printf "+%.1fpp", d
+        else printf "%.1fpp", d
+    }')
+    rel_change=$(awk -v s="$start" -v e="$end" 'BEGIN {
+        if (s == 0) { printf "N/A"; exit }
+        d = ((e - s) / s) * 100
+        if (d >= 0) printf "+%.1f%%", d
+        else printf "%.1f%%", d
+    }')
+
+    echo "起始: $start_fmt"
+    echo "结束: $end_fmt"
+    echo "绝对变化: $abs_change"
+    echo "相对变化: $rel_change"
+}
+
+# 格式化交易量趋势表格
+# 输入: JSON 数组（每项至少包含 timestamp/date 和 volume/value）
+format_volume_trend_table() {
+    local input
+    input=$(cat)
+
+    if ! echo "$input" | jq -e 'type == "array"' >/dev/null 2>&1; then
+        echo "数据格式无效"
+        return 1
+    fi
+
+    local len
+    len=$(echo "$input" | jq 'length')
+    if [ "$len" -eq 0 ]; then
+        echo "暂无交易量数据"
+        return 0
+    fi
+
+    printf "%-12s | %-10s\n" "日期" "交易量"
+    printf -- "-------------+------------\n"
+    echo "$input" | jq -r '
+        .[] |
+        [
+            (.timestamp // .time // .ts // .date // .datetime // ""),
+            (.volume // .value // .vol // "")
+        ] | @tsv
+    ' | while IFS=$'\t' read -r raw_time raw_volume; do
+        local day vol
+        day=$(_format_series_date "$raw_time")
+        vol=$(format_volume "$raw_volume")
+        printf "%-12s | %-10s\n" "$day" "$vol"
+    done
+}
