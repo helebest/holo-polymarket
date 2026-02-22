@@ -95,3 +95,120 @@ fetch_trades() {
     fi
     data_get "/trades" "user=${user}&limit=${limit}"
 }
+
+# ==================== Phase 2b: 历史数据与趋势 ====================
+
+# 验证 interval 参数
+# 用法: validate_interval <interval>
+# 支持: 1h | 4h | 1d
+validate_interval() {
+    local interval="$1"
+    case "$interval" in
+        1h|4h|1d)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+# 验证时间范围
+# 用法: validate_time_range <from> <to>
+# 日期格式: YYYY-MM-DD, 且 from <= to
+validate_time_range() {
+    local from_date="$1"
+    local to_date="$2"
+
+    if ! echo "$from_date" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
+        return 1
+    fi
+    if ! echo "$to_date" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
+        return 1
+    fi
+
+    local from_epoch
+    local to_epoch
+    from_epoch=$(date -d "$from_date" +%s 2>/dev/null) || return 1
+    to_epoch=$(date -d "$to_date" +%s 2>/dev/null) || return 1
+
+    [ "$from_epoch" -le "$to_epoch" ]
+}
+
+# 获取价格历史数据
+# 用法: fetch_price_history <event_slug> <from> <to> [interval]
+fetch_price_history() {
+    local slug="$1"
+    local from_date="$2"
+    local to_date="$3"
+    local interval="${4:-1d}"
+
+    if [ -z "$slug" ]; then
+        echo "[]"
+        return 1
+    fi
+    validate_time_range "$from_date" "$to_date" || {
+        echo "[]"
+        return 1
+    }
+    validate_interval "$interval" || {
+        echo "[]"
+        return 1
+    }
+
+    # API skeleton: 统一通过 data-api 获取历史价格
+    data_get "/history/prices" "slug=${slug}&from=${from_date}&to=${to_date}&interval=${interval}"
+}
+
+# 获取交易量历史数据
+# 用法: fetch_volume_history <event_slug> <from> <to> [interval]
+fetch_volume_history() {
+    local slug="$1"
+    local from_date="$2"
+    local to_date="$3"
+    local interval="${4:-1d}"
+
+    if [ -z "$slug" ]; then
+        echo "[]"
+        return 1
+    fi
+    validate_time_range "$from_date" "$to_date" || {
+        echo "[]"
+        return 1
+    }
+    validate_interval "$interval" || {
+        echo "[]"
+        return 1
+    }
+
+    # API skeleton: 统一通过 data-api 获取历史交易量
+    data_get "/history/volume" "slug=${slug}&from=${from_date}&to=${to_date}&interval=${interval}"
+}
+
+# 统一历史序列查询入口
+# 用法: fetch_history_series <price|volume> <event_slug> <from> <to> [interval]
+fetch_history_series() {
+    local series_type="$1"
+    local slug="$2"
+    local from_date="$3"
+    local to_date="$4"
+    local interval="${5:-1d}"
+
+    if [ -z "$slug" ]; then
+        echo "[]"
+        return 1
+    fi
+
+    case "$series_type" in
+        price)
+            fetch_price_history "$slug" "$from_date" "$to_date" "$interval"
+            ;;
+        volume)
+            fetch_volume_history "$slug" "$from_date" "$to_date" "$interval"
+            ;;
+        *)
+            echo "[]"
+            return 1
+            ;;
+    esac
+}

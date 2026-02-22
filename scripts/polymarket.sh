@@ -83,6 +83,69 @@ case "$CMD" in
         echo ""
         fetch_trades "$ADDR" "$LIMIT" | format_trades
         ;;
+    history)
+        SLUG="$1"
+        FROM_DATE="$2"
+        TO_DATE="$3"
+        INTERVAL="${4:-1d}"
+        if [ -z "$SLUG" ] || [ -z "$FROM_DATE" ] || [ -z "$TO_DATE" ]; then
+            echo "用法: bash polymarket.sh history <event-slug> <from> <to> [interval]"
+            exit 1
+        fi
+        if ! validate_time_range "$FROM_DATE" "$TO_DATE"; then
+            echo "时间范围无效: from/to 必须是 YYYY-MM-DD 且 from <= to"
+            exit 1
+        fi
+        if ! validate_interval "$INTERVAL"; then
+            echo "interval 无效: 仅支持 1h/4h/1d"
+            exit 1
+        fi
+        echo "🕒 历史价格: ${SLUG} | ${FROM_DATE} -> ${TO_DATE} | ${INTERVAL}"
+        echo ""
+        fetch_history_series "price" "$SLUG" "$FROM_DATE" "$TO_DATE" "$INTERVAL"
+        ;;
+    trend)
+        SLUG="$1"
+        FROM_DATE="$2"
+        TO_DATE="$3"
+        INTERVAL="${4:-1d}"
+        if [ -z "$SLUG" ] || [ -z "$FROM_DATE" ] || [ -z "$TO_DATE" ]; then
+            echo "用法: bash polymarket.sh trend <event-slug> <from> <to> [interval]"
+            exit 1
+        fi
+        if ! validate_time_range "$FROM_DATE" "$TO_DATE"; then
+            echo "时间范围无效: from/to 必须是 YYYY-MM-DD 且 from <= to"
+            exit 1
+        fi
+        if ! validate_interval "$INTERVAL"; then
+            echo "interval 无效: 仅支持 1h/4h/1d"
+            exit 1
+        fi
+        echo "📈 概率趋势: ${SLUG} | ${FROM_DATE} -> ${TO_DATE} | ${INTERVAL}"
+        echo ""
+        fetch_history_series "price" "$SLUG" "$FROM_DATE" "$TO_DATE" "$INTERVAL"
+        ;;
+    volume-trend)
+        SLUG="$1"
+        FROM_DATE="$2"
+        TO_DATE="$3"
+        INTERVAL="${4:-1d}"
+        if [ -z "$SLUG" ] || [ -z "$FROM_DATE" ] || [ -z "$TO_DATE" ]; then
+            echo "用法: bash polymarket.sh volume-trend <event-slug> <from> <to> [interval]"
+            exit 1
+        fi
+        if ! validate_time_range "$FROM_DATE" "$TO_DATE"; then
+            echo "时间范围无效: from/to 必须是 YYYY-MM-DD 且 from <= to"
+            exit 1
+        fi
+        if ! validate_interval "$INTERVAL"; then
+            echo "interval 无效: 仅支持 1h/4h/1d"
+            exit 1
+        fi
+        echo "📊 交易量趋势: ${SLUG} | ${FROM_DATE} -> ${TO_DATE} | ${INTERVAL}"
+        echo ""
+        fetch_history_series "volume" "$SLUG" "$FROM_DATE" "$TO_DATE" "$INTERVAL"
+        ;;
     *)
         echo "Holo Polymarket - 预测市场工具"
         echo ""
@@ -95,6 +158,9 @@ case "$CMD" in
         echo "  leaderboard [limit] [pnl|vol]  查看排行榜（默认按盈利）"
         echo "  positions <地址> [limit]       查看用户持仓"
         echo "  trades <地址> [limit]          查看用户交易记录"
+        echo "  history <slug> <from> <to> [interval]      历史价格"
+        echo "  trend <slug> <from> <to> [interval]        概率趋势"
+        echo "  volume-trend <slug> <from> <to> [interval] 交易量趋势"
         echo ""
         echo "别名: lb = leaderboard, pos = positions"
         echo ""
@@ -104,6 +170,7 @@ case "$CMD" in
         echo "  bash polymarket.sh lb 5 vol"
         echo "  bash polymarket.sh positions 0xc257ea7e...358e 10"
         echo "  bash polymarket.sh trades 0xc257ea7e...358e 5"
+        echo "  bash polymarket.sh history fed-decision-in-march-885 2025-01-01 2025-01-31 1d"
         exit 1
         ;;
 esac

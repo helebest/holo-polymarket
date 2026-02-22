@@ -26,6 +26,7 @@ run_test_file "$SCRIPT_DIR/test_format.sh"
 run_test_file "$SCRIPT_DIR/test_format_data.sh"
 run_test_file "$SCRIPT_DIR/test_api.sh"
 run_test_file "$SCRIPT_DIR/test_data_api.sh"
+run_test_file "$SCRIPT_DIR/test_phase2b_api.sh"
 
 echo ""
 echo "================================="
