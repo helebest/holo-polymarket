@@ -4,7 +4,9 @@
 # 所有 API 调用集中在这里，方便测试和替换
 
 GAMMA_API="${GAMMA_API_BASE:-https://gamma-api.polymarket.com}"
+CLOB_API="${CLOB_API_BASE:-https://clob.polymarket.com}"
 CURL_TIMEOUT="${CURL_TIMEOUT:-15}"
+POLYMARKET_CREDENTIALS_FILE="${POLYMARKET_CREDENTIALS_FILE:-$HOME/.openclaw/credentials/polymarket_credentials}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/cache.sh"
 
@@ -18,6 +20,65 @@ gamma_get() {
         url="${url}?${params}"
     fi
     curl -s --max-time "$CURL_TIMEOUT" "$url"
+}
+
+# 读取 Polymarket Bearer Token（优先环境变量，其次 credentials 文件）
+load_polymarket_bearer_token() {
+    if [ -n "${POLYMARKET_BEARER_TOKEN:-}" ]; then
+        echo "$POLYMARKET_BEARER_TOKEN"
+        return 0
+    fi
+
+    if [ -n "${_POLYMARKET_BEARER_TOKEN:-}" ]; then
+        echo "$_POLYMARKET_BEARER_TOKEN"
+        return 0
+    fi
+
+    if [ ! -f "$POLYMARKET_CREDENTIALS_FILE" ]; then
+        return 1
+    fi
+
+    # 兼容 BEARER_TOKEN/TOKEN/API_KEY 三种字段名
+    local token
+    token=$(awk -F'=' '
+        /^[[:space:]]*#/ { next }
+        /^[[:space:]]*$/ { next }
+        {
+            k=$1
+            v=$2
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", k)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+            if (k=="BEARER_TOKEN" || k=="TOKEN" || k=="API_KEY") {
+                print v
+                exit
+            }
+        }
+    ' "$POLYMARKET_CREDENTIALS_FILE")
+
+    if [ -z "$token" ]; then
+        return 1
+    fi
+
+    _POLYMARKET_BEARER_TOKEN="$token"
+    echo "$token"
+}
+
+# 通用 CLOB API GET 请求（Bearer Token 认证）
+# 用法: clob_get "/prices-history" "market=...&startTs=...&endTs=..."
+clob_get() {
+    local path="$1"
+    local params="$2"
+    local url="${CLOB_API}${path}"
+    local bearer_token
+
+    if [ -n "$params" ]; then
+        url="${url}?${params}"
+    fi
+
+    bearer_token=$(load_polymarket_bearer_token) || return 1
+    curl -s --max-time "$CURL_TIMEOUT" \
+        -H "Authorization: Bearer ${bearer_token}" \
+        "$url"
 }
 
 # 获取热门事件
@@ -100,6 +161,44 @@ fetch_trades() {
 
 # ==================== Phase 2b: 历史数据与趋势 ====================
 
+# 通过市场 slug 获取 CLOB token ID
+# 用法: get_clob_token_id <market_slug>
+get_clob_token_id() {
+    local slug="$1"
+    local key cached response token_id
+
+    if [ -z "$slug" ]; then
+        return 1
+    fi
+
+    key=$(cache_key "clob-token-id" "$GAMMA_API" "slug=${slug}")
+    if cached=$(cache_get "$key"); then
+        echo "$cached"
+        return 0
+    fi
+
+    response=$(gamma_get "/markets" "slug=${slug}")
+    token_id=$(echo "$response" | jq -r '
+        .[0] // empty |
+        (
+            .clobTokenId //
+            (
+                .clobTokenIds //
+                "[]"
+                | if type == "string" then (fromjson? // []) else . end
+                | .[0]
+            )
+        ) // empty
+    ')
+
+    if [ -z "$token_id" ] || [ "$token_id" = "null" ]; then
+        return 1
+    fi
+
+    cache_set "$key" "$token_id" "${CACHE_TTL:-300}" >/dev/null 2>&1
+    echo "$token_id"
+}
+
 # 验证 interval 参数
 # 用法: validate_interval <interval>
 # 支持: 1h | 4h | 1d
@@ -137,14 +236,14 @@ validate_time_range() {
     [ "$from_epoch" -le "$to_epoch" ]
 }
 
-# 获取价格历史数据
-# 用法: fetch_price_history <event_slug> <from> <to> [interval]
+# 获取价格历史数据（通过 market slug -> clobTokenId -> CLOB prices-history）
+# 用法: fetch_price_history <market_slug> <from> <to> [interval]
 fetch_price_history() {
     local slug="$1"
     local from_date="$2"
     local to_date="$3"
     local interval="${4:-1d}"
-    local params key cached response
+    local from_ts to_ts bucket token_id params key cached response
 
     if [ -z "$slug" ]; then
         echo "[]"
@@ -159,15 +258,63 @@ fetch_price_history() {
         return 1
     }
 
-    params="slug=${slug}&from=${from_date}&to=${to_date}&interval=${interval}"
-    key=$(cache_key "history-price" "$DATA_API" "$params")
+    token_id=$(get_clob_token_id "$slug") || {
+        echo "[]"
+        return 1
+    }
+
+    from_ts=$(date -u -d "${from_date} 00:00:00" +%s 2>/dev/null) || {
+        echo "[]"
+        return 1
+    }
+    to_ts=$(date -u -d "${to_date} 23:59:59" +%s 2>/dev/null) || {
+        echo "[]"
+        return 1
+    }
+
+    case "$interval" in
+        1h) bucket=3600 ;;
+        4h) bucket=14400 ;;
+        1d) bucket=86400 ;;
+        *) echo "[]"; return 1 ;;
+    esac
+
+    params="market=${token_id}&startTs=${from_ts}&endTs=${to_ts}&fidelity=1"
+    key=$(cache_key "history-price" "$CLOB_API" "${params}&interval=${interval}")
     if cached=$(cache_get "$key"); then
         echo "$cached"
         return 0
     fi
 
-    # API skeleton: 统一通过 data-api 获取历史价格
-    response=$(data_get "/history/prices" "$params")
+    response=$(clob_get "/prices-history" "$params") || {
+        echo "[]"
+        return 1
+    }
+
+    response=$(echo "$response" | jq -c \
+        --argjson from "$from_ts" \
+        --argjson to "$to_ts" \
+        --argjson bucket "$bucket" '
+        [ (.history // . // [])[]?
+          | {
+                timestamp: ((.t // .timestamp // .time // .ts // .date // .datetime // empty) | tonumber?),
+                price: ((.p // .price // .value // .close // empty) | tonumber?)
+            }
+          | select(.timestamp != null and .price != null)
+          | select(.timestamp >= $from and .timestamp <= $to)
+        ]
+        | if $bucket > 1 then
+            group_by((.timestamp / $bucket | floor))
+            | map(.[-1])
+          else
+            .
+          end
+        | sort_by(.timestamp)
+    ')
+    if [ -z "$response" ] || [ "$response" = "null" ]; then
+        response="[]"
+    fi
+
     cache_set "$key" "$response" "${CACHE_TTL:-60}" >/dev/null 2>&1
     echo "$response"
 }
@@ -208,7 +355,7 @@ fetch_volume_history() {
 }
 
 # 统一历史序列查询入口
-# 用法: fetch_history_series <price|volume> <event_slug> <from> <to> [interval]
+# 用法: fetch_history_series <price|volume> <market_slug> <from> <to> [interval]
 fetch_history_series() {
     local series_type="$1"
     local slug="$2"
