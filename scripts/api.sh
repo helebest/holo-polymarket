@@ -139,7 +139,7 @@ fetch_leaderboard() {
 fetch_positions() {
     local user="$1"
     local limit="${2:-10}"
-    local sort_by="${3:-CASH_PNL}"
+    local sort_by="${3:-CASHPNL}"
     if [ -z "$user" ]; then
         echo "[]"
         return 1

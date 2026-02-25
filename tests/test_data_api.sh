@@ -103,7 +103,7 @@ else
 fi
 
 echo "[Test 7] fetch_positions with sortBy works"
-POS_SORTED=$(fetch_positions "$WALLET_ADDR" 2 "CASH_PNL")
+POS_SORTED=$(fetch_positions "$WALLET_ADDR" 2 "CASHPNL")
 IS_ARRAY=$(echo "$POS_SORTED" | jq 'type' 2>/dev/null)
 assert_eq "sorted positions is JSON array" '"array"' "$IS_ARRAY"
 
