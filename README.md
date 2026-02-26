@@ -36,8 +36,12 @@ bash scripts/polymarket.sh search <关键词> [limit]
 # 查看事件详情
 bash scripts/polymarket.sh detail <event-slug>
 
-# 排行榜（按盈利或交易量）
-bash scripts/polymarket.sh leaderboard [limit] [pnl|vol]
+# 排行榜（按盈利或交易量，支持时间筛选）
+bash scripts/polymarket.sh leaderboard [limit] [pnl|vol] [day|week|month|all]
+# 按盈利，周榜 Top10
+bash scripts/polymarket.sh lb 10 pnl week
+# 按交易量，月榜 Top5
+bash scripts/polymarket.sh lb 5 vol month
 
 # 查看用户持仓
 bash scripts/polymarket.sh positions <钱包地址> [limit]

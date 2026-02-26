@@ -150,15 +150,34 @@ case "$CMD" in
     leaderboard|lb)
         LIMIT="${1:-10}"
         ORDER="${2:-pnl}"
+        TIME="${3:-DAY}"
+        
+        # 解析 -t/--time 参数
+        if [[ "$1" == "-t" ]] || [[ "$1" == "--time" ]]; then
+            TIME="${2:-DAY}"
+            LIMIT="${3:-10}"
+            ORDER="${4:-pnl}"
+        fi
+        
+        # 转换时间参数
+        case "$TIME" in
+            d|day|DAY) TIME="DAY" ;;
+            w|week|WEEK) TIME="WEEK" ;;
+            m|month|MONTH) TIME="MONTH" ;;
+            a|all|ALL) TIME="ALL" ;;
+            *) TIME="DAY" ;;
+        esac
+        
+        # 解析排序
         if [ "$ORDER" = "vol" ] || [ "$ORDER" = "volume" ]; then
-            echo "🏆 Polymarket 排行榜 (按交易量, Top ${LIMIT})"
             ORDER="vol"
         else
-            echo "🏆 Polymarket 排行榜 (按盈利, Top ${LIMIT})"
             ORDER="pnl"
         fi
+        
+        echo "🏆 Polymarket 排行榜 (按${ORDER:-盈利}, ${TIME}, Top ${LIMIT})"
         echo ""
-        fetch_leaderboard "$LIMIT" "$ORDER" | format_leaderboard
+        fetch_leaderboard "$LIMIT" "$ORDER" "$TIME" | format_leaderboard
         ;;
     positions|pos)
         ADDR="$1"
@@ -385,7 +404,7 @@ case "$CMD" in
         echo "  hot [limit]                    查看热门预测（默认5条）"
         echo "  search <关键词> [limit]        搜索预测市场"
         echo "  detail <event-slug>            查看事件详情"
-        echo "  leaderboard [limit] [pnl|vol]  查看排行榜（默认按盈利）"
+        echo "  leaderboard [limit] [pnl|vol] [day|week|month|all]  查看排行榜（默认按盈利，按时间筛选）"
         echo "  positions <地址> [limit]       查看用户持仓"
         echo "  trades <地址> [limit]          查看用户交易记录"
         echo "  buy <slug> <outcome> <price> <amount> [type]   开多单（买入）"
@@ -400,6 +419,7 @@ case "$CMD" in
         echo "  bash polymarket.sh hot 3"
         echo "  bash polymarket.sh search bitcoin"
         echo "  bash polymarket.sh lb 5 vol"
+        echo "  bash polymarket.sh lb 10 pnl week  # 按盈利，周榜 Top10"
         echo "  bash polymarket.sh positions 0xc257ea7e...358e 10"
         echo "  bash polymarket.sh trades 0xc257ea7e...358e 5"
         echo "  bash polymarket.sh buy will-meteora-be-accused-of-insider-trading Yes 0.30 10"

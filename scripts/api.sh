@@ -81,19 +81,83 @@ clob_get() {
         "$url"
 }
 
-# 通用 CLOB API POST 请求（Bearer Token 认证）
+# 读取 Polymarket 凭据（L2 认证用）
+load_clob_credentials() {
+    if [ ! -f "$POLYMARKET_CREDENTIALS_FILE" ]; then
+        return 1
+    fi
+    
+    # 读取 API_KEY, SECRET, PASSPHRASE, ADDRESS
+    export POLY_API_KEY=$(grep "^API_KEY=" "$POLYMARKET_CREDENTIALS_FILE" | cut -d'=' -f2)
+    export POLY_SECRET=$(grep "^SECRET=" "$POLYMARKET_CREDENTIALS_FILE" | cut -d'=' -f2)
+    export POLY_PASSPHRASE=$(grep "^PASSPHRASE=" "$POLYMARKET_CREDENTIALS_FILE" | cut -d'=' -f2)
+    # 如果没有 ADDRESS，使用默认地址或从环境变量读取
+    export POLY_ADDRESS="${POLY_ADDRESS:-$(grep "^ADDRESS=" "$POLYMARKET_CREDENTIALS_FILE" | cut -d'=' -f2)}"
+    
+    if [ -z "$POLY_API_KEY" ] || [ -z "$POLY_SECRET" ]; then
+        return 1
+    fi
+}
+
+# 生成 L2 认证签名
+# 用法: generate_clob_signature <method> <path> <body> <timestamp>
+generate_clob_signature() {
+    local method="$1"
+    local path="$2"
+    local body="$3"
+    local timestamp="$4"
+    
+    # 构建待签名字符串: timestamp + method + path + body
+    local string_to_sign="${timestamp}${method}${path}${body}"
+    
+    # 使用 HMAC-SHA256
+    echo -n "$string_to_sign" | openssl dgst -sha256 -hmac "$POLY_SECRET" -binary | base64
+}
+
+# 通用 CLOB API POST 请求（L2 认证）
 # 用法: clob_post "/order" '{"token_id":"...","price":0.5,"size":10,"side":"BUY"}'
 clob_post() {
     local path="$1"
     local data="$2"
     local url="${CLOB_API}${path}"
-    local bearer_token
-
-    bearer_token=$(load_polymarket_bearer_token) || return 1
+    
+    # 加载凭据
+    load_clob_credentials || { echo '{"error": "failed to load credentials"}'; return 1; }
+    
+    # 生成认证 headers
+    local timestamp=$(date +%s)
+    local signature=$(generate_clob_signature "POST" "$path" "$data" "$timestamp")
+    
     curl -s --max-time "$CURL_TIMEOUT" -X POST \
-        -H "Authorization: Bearer ${bearer_token}" \
         -H "Content-Type: application/json" \
+        -H "POLY_ADDRESS: ${POLY_ADDRESS}" \
+        -H "POLY_API_KEY: ${POLY_API_KEY}" \
+        -H "POLY_TIMESTAMP: ${timestamp}" \
+        -H "POLY_SIGNATURE: ${signature}" \
+        -H "POLY_PASSPHRASE: ${POLY_PASSPHRASE}" \
         -d "$data" \
+        "$url"
+}
+
+# 通用 CLOB API DELETE 请求（L2 认证）
+# 用法: clob_delete "/orders/<order_id>"
+clob_delete() {
+    local path="$1"
+    local url="${CLOB_API}${path}"
+    
+    # 加载凭据
+    load_clob_credentials || { echo '{"error": "failed to load credentials"}'; return 1; }
+    
+    # 生成认证 headers
+    local timestamp=$(date +%s)
+    local signature=$(generate_clob_signature "DELETE" "$path" "" "$timestamp")
+    
+    curl -s --max-time "$CURL_TIMEOUT" -X DELETE \
+        -H "POLY_ADDRESS: ${POLY_ADDRESS}" \
+        -H "POLY_API_KEY: ${POLY_API_KEY}" \
+        -H "POLY_TIMESTAMP: ${timestamp}" \
+        -H "POLY_SIGNATURE: ${signature}" \
+        -H "POLY_PASSPHRASE: ${POLY_PASSPHRASE}" \
         "$url"
 }
 
@@ -141,12 +205,21 @@ data_get() {
 }
 
 # 获取排行榜
-# 用法: fetch_leaderboard [limit] [orderBy]
+# 用法: fetch_leaderboard [limit] [orderBy] [timePeriod]
 # orderBy: pnl (默认) | vol
+# timePeriod: DAY (默认) | WEEK | MONTH | ALL
 fetch_leaderboard() {
     local limit="${1:-10}"
     local order_by="${2:-pnl}"
-    data_get "/v1/leaderboard" "limit=${limit}&orderBy=${order_by}"
+    local time_period="${3:-DAY}"
+    
+    # 验证 timePeriod
+    case "$time_period" in
+        DAY|WEEK|MONTH|ALL) ;;
+        *) time_period="DAY" ;;
+    esac
+    
+    data_get "/v1/leaderboard" "limit=${limit}&orderBy=${order_by}&timePeriod=${time_period}"
 }
 
 # 获取用户持仓
