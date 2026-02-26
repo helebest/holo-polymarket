@@ -81,6 +81,22 @@ clob_get() {
         "$url"
 }
 
+# 通用 CLOB API POST 请求（Bearer Token 认证）
+# 用法: clob_post "/order" '{"token_id":"...","price":0.5,"size":10,"side":"BUY"}'
+clob_post() {
+    local path="$1"
+    local data="$2"
+    local url="${CLOB_API}${path}"
+    local bearer_token
+
+    bearer_token=$(load_polymarket_bearer_token) || return 1
+    curl -s --max-time "$CURL_TIMEOUT" -X POST \
+        -H "Authorization: Bearer ${bearer_token}" \
+        -H "Content-Type: application/json" \
+        -d "$data" \
+        "$url"
+}
+
 # 获取热门事件
 # 用法: fetch_hot_events [limit]
 fetch_hot_events() {
@@ -177,6 +193,7 @@ get_clob_token_id() {
         return 0
     fi
 
+    # 先尝试精确匹配
     response=$(gamma_get "/markets" "slug=${slug}")
     token_id=$(echo "$response" | jq -r '
         .[0] // empty |
@@ -191,12 +208,67 @@ get_clob_token_id() {
         ) // empty
     ')
 
+    # 如果精确匹配失败，尝试 search
+    if [ -z "$token_id" ] || [ "$token_id" = "null" ]; then
+        response=$(gamma_get "/markets" "search=${slug}&limit=1")
+        token_id=$(echo "$response" | jq -r '
+            .[0] // empty |
+            (
+                .clobTokenId //
+                (
+                    .clobTokenIds //
+                    "[]"
+                    | if type == "string" then (fromjson? // []) else . end
+                    | .[0]
+                )
+            ) // empty
+        ')
+    fi
+
     if [ -z "$token_id" ] || [ "$token_id" = "null" ]; then
         return 1
     fi
 
     cache_set "$key" "$token_id" "${CACHE_TTL:-300}" >/dev/null 2>&1
     echo "$token_id"
+}
+
+# 下单（市价单/限价单）
+# 用法: place_order <token_id> <price> <size> <side> [order_type]
+# side: BUY | SELL
+# order_type: GTC (默认) | FOK | IOC
+place_order() {
+    local token_id="$1"
+    local price="$2"
+    local size="$3"
+    local side="$4"
+    local order_type="${5:-GTC}"
+
+    if [ -z "$token_id" ] || [ -z "$price" ] || [ -z "$size" ] || [ -z "$side" ]; then
+        echo '{"error": "missing required parameters"}'
+        return 1
+    fi
+
+    # 验证 side
+    case "$side" in
+        BUY|SELL) ;;
+        *) echo '{"error": "side must be BUY or SELL"}'; return 1 ;;
+    esac
+
+    # 构建订单 JSON
+    local order_json
+    order_json=$(cat <<EOF
+{
+    "token_id": "$token_id",
+    "price": $price,
+    "size": $size,
+    "side": "$side",
+    "order_type": "$order_type"
+}
+EOF
+)
+
+    clob_post "/orders" "$order_json"
 }
 
 # 验证 interval 参数

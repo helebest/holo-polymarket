@@ -11,10 +11,11 @@ Polymarket 预测市场工具 — 查询、分析、追踪大户，一站式接�
 - **leaderboard** — 排行榜（按盈利或交易量排名）
 - **positions** — 查看任意用户的当前持仓与盈亏
 - **trades** — 查看任意用户的交易记录
+- **buy** — 开多单（买入）
+- **sell** — 开空单（卖出）
 
 ### 规划中
-- 历史数据查询与概率趋势分析
-- 交易下单（市价单/限价单）
+- 交易下单（市价单/限价单）✅ 已完成
 - 持仓管理与盈亏追踪
 
 ## 前置条件
@@ -43,6 +44,17 @@ bash scripts/polymarket.sh positions <钱包地址> [limit]
 
 # 查看用户交易记录
 bash scripts/polymarket.sh trades <钱包地址> [limit]
+
+# 下单（买入）
+bash scripts/polymarket.sh buy <event-slug> <outcome> <price> <amount> [order_type]
+# 示例：买入 Meteora 内幕交易预测 $10 @ 30%
+bash scripts/polymarket.sh buy will-meteora-be-accused-of-insider-trading Yes 0.30 10
+
+# 模拟下单（不实际执行）
+DRY_RUN=1 bash scripts/polymarket.sh buy will-meteora-be-accused-of-insider-trading Yes 0.30 10
+
+# 下单（卖出）
+bash scripts/polymarket.sh sell <event-slug> <outcome> <price> <amount> [order_type]
 
 # 历史价格（默认 interval=1d）
 bash scripts/polymarket.sh history <event-slug> <from> <to> [interval]

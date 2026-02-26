@@ -1,6 +1,6 @@
 ---
 name: holo-polymarket
-description: Polymarket 预测市场工具。查询热门预测、搜索市场、分析概率趋势、追踪大户持仓。
+description: Polymarket 预测市场工具。查询热门预测、搜索市场、分析概率趋势、追踪大户持仓、实盘交易下单。
 homepage: https://github.com/helebest/holo-polymarket
 ---
 
@@ -54,6 +54,25 @@ bash {baseDir}/scripts/polymarket.sh trend <event-slug> <from> <to> [interval]
 bash {baseDir}/scripts/polymarket.sh volume-trend <event-slug> <from> <to> [interval]
 ```
 
+### 交易下单（CLOB API）
+
+```bash
+# 买入（开多）
+bash {baseDir}/scripts/polymarket.sh buy <event-slug> <outcome> <price> <amount> [order_type]
+
+# 卖出（开空）
+bash {baseDir}/scripts/polymarket.sh sell <event-slug> <outcome> <price> <amount> [order_type]
+```
+
+参数说明：
+- `event-slug`: 市场 slug（从 search 或 detail 获取）
+- `outcome`: Yes 或 No
+- `price`: 价格（0.01-0.99）
+- `amount`: 数量（美元）
+- `order_type`: GTC(默认) | FOK | IOC
+
+⚠️ **重要**: 真实交易需要正确的 CLOB API 认证凭据。使用 `DRY_RUN=1` 模拟测试：
+
 时间范围参数：
 - `from`: 开始日期（`YYYY-MM-DD`）
 - `to`: 结束日期（`YYYY-MM-DD`）
@@ -93,6 +112,12 @@ bash {baseDir}/scripts/polymarket.sh trend fed-decision-in-march-885 2025-01-01 
 
 # 交易量趋势并导出 CSV
 bash {baseDir}/scripts/polymarket.sh volume-trend fed-decision-in-march-885 2025-01-01 2025-01-31 --format csv --out /tmp/volume.csv
+
+# 买入预测（模拟测试）
+DRY_RUN=1 bash {baseDir}/scripts/polymarket.sh buy will-meteora-be-accused-of-insider-trading Yes 0.30 10
+
+# 真实买入（会提示确认）
+bash {baseDir}/scripts/polymarket.sh buy will-meteora-be-accused-of-insider-trading Yes 0.30 10
 ```
 
 ## 别名
