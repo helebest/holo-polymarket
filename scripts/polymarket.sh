@@ -241,13 +241,26 @@ case "$CMD" in
         echo "   类型: $ORDER_TYPE"
         echo ""
         
-        # 检查是否为 dry-run 模式
-        if [ "${DRY_RUN:-0}" = "1" ]; then
-            echo "🔸 [DRY RUN] 模拟下单（实际不会执行）"
-            echo "   token_id: $TOKEN_ID"
-            place_order "$TOKEN_ID" "$PRICE" "$AMOUNT" "$SIDE" "$ORDER_TYPE" | jq '.'
-            exit 0
-        fi
+        # DRY_RUN 模式检查
+        case "${DRY_RUN:-0}" in
+            1)
+                echo "🔸 [DRY RUN] 模拟下单（不发送真实请求）"
+                echo "   market: $SLUG"
+                echo "   side: $SIDE ($OUTCOME)"
+                echo "   price: \$$PRICE"
+                echo "   size: \$$AMOUNT"
+                echo "   order_type: $ORDER_TYPE"
+                echo "   token_id: $TOKEN_ID"
+                echo ""
+                echo "✅ 模拟完成，未发送真实订单"
+                exit 0
+                ;;
+            0) ;;
+            *)
+                echo "❌ 无效的 DRY_RUN 值: $DRY_RUN (应为 0 或 1)"
+                exit 1
+                ;;
+        esac
         
         echo "⚠️  确认下单? (输入 'yes' 确认，其他取消)"
         read -r confirm
@@ -299,13 +312,26 @@ case "$CMD" in
         echo "   类型: $ORDER_TYPE"
         echo ""
         
-        # 检查是否为 dry-run 模式
-        if [ "${DRY_RUN:-0}" = "1" ]; then
-            echo "🔸 [DRY RUN] 模拟下单（实际不会执行）"
-            echo "   token_id: $TOKEN_ID"
-            place_order "$TOKEN_ID" "$PRICE" "$AMOUNT" "$SIDE" "$ORDER_TYPE" | jq '.'
-            exit 0
-        fi
+        # DRY_RUN 模式检查
+        case "${DRY_RUN:-0}" in
+            1)
+                echo "🔸 [DRY RUN] 模拟下单（不发送真实请求）"
+                echo "   market: $SLUG"
+                echo "   side: $SIDE ($OUTCOME)"
+                echo "   price: \$$PRICE"
+                echo "   size: \$$AMOUNT"
+                echo "   order_type: $ORDER_TYPE"
+                echo "   token_id: $TOKEN_ID"
+                echo ""
+                echo "✅ 模拟完成，未发送真实订单"
+                exit 0
+                ;;
+            0) ;;
+            *)
+                echo "❌ 无效的 DRY_RUN 值: $DRY_RUN (应为 0 或 1)"
+                exit 1
+                ;;
+        esac
         
         echo "⚠️  确认下单? (输入 'yes' 确认，其他取消)"
         read -r confirm
