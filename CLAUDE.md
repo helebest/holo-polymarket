@@ -19,6 +19,9 @@ bash tests/test_format.sh
 bash tests/test_api.sh        # requires network (live API calls)
 bash tests/test_cache.sh      # self-contained, uses temp directory
 
+# Run end-to-end test (requires network, not in run_tests.sh)
+bash tests/test_e2e_hot_detail.sh
+
 # Run the CLI
 bash scripts/polymarket.sh <command> [args...]
 

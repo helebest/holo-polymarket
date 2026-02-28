@@ -12,6 +12,7 @@ homepage: https://github.com/helebest/holo-polymarket
 
 1. `jq` 和 `curl` 已安装
 2. 网络访问：能够访问 `gamma-api.polymarket.com` 和 `data-api.polymarket.com`
+3. 官方 [Polymarket CLI](https://github.com/Polymarket/polymarket-cli) 已安装并配置，用于交易和余额查询
 
 ## 使用方法
 
@@ -66,7 +67,6 @@ bash {baseDir}/scripts/polymarket.sh volume-trend <event-slug> <from> <to> [inte
 
 ### 交易与余额（官方 Polymarket CLI）
 
-交易功能由官方 [Polymarket CLI](https://github.com/Polymarket/polymarket-cli) 提供，需提前安装并配置钱包。
 
 ```bash
 # 查看余额
