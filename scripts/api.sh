@@ -350,10 +350,14 @@ get_clob_token_id() {
     echo "$token_id"
 }
 
-# 检查 signer 依赖（uv）
+# 使用全局 venv（依赖由 openclaw_deploy_skill.sh 安装）
+# 可通过环境变量覆盖，如开发环境: PYTHON_CMD="uv run python"
+PYTHON_CMD="${PYTHON_CMD:-$HOME/.openclaw/.venv/bin/python3}"
+
+# 检查 signer 依赖（Python + py-clob-client）
 check_signer_deps() {
-    if ! command -v uv >/dev/null 2>&1; then
-        echo '{"error": "uv 未安装。请先安装: curl -LsSf https://astral.sh/uv/install.sh | sh"}'
+    if [ ! -x "$PYTHON_CMD" ]; then
+        echo '{"error": "Python 环境未就绪。请先运行 openclaw_deploy_skill.sh 安装依赖"}'
         return 1
     fi
 }
@@ -430,7 +434,7 @@ place_order() {
     creds_json=$(printf '{"private_key":"%s","api_key":"%s","api_secret":"%s","api_passphrase":"%s"}' \
         "$POLY_PRIVATE_KEY" "$POLY_API_KEY" "$POLY_SECRET" "$POLY_PASSPHRASE")
 
-    signed_order=$(echo "$creds_json" | uv run python "$SCRIPT_DIR/signer.py" \
+    signed_order=$(echo "$creds_json" | $PYTHON_CMD "$SCRIPT_DIR/signer.py" \
         --credentials-stdin \
         --token-id "$token_id" \
         --price "$price" --size "$size" --side "$side" \

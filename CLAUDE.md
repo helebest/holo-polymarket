@@ -11,7 +11,7 @@ Language: **Bash**. Dependencies: `curl`, `jq`.
 ## Commands
 
 ```bash
-# Run all tests (8 test suites)
+# Run all tests (9 test suites)
 bash tests/run_tests.sh
 
 # Run a single test file
@@ -38,6 +38,7 @@ The CLI entry point is `scripts/polymarket.sh`, which sources three modules and 
 - **`scripts/format.sh`** — All output formatting. Receives JSON via stdin pipe, outputs human-readable text. Functions named `format_*` (e.g., `format_hot_events`, `format_leaderboard`, `format_price_history_table`).
 - **`scripts/cache.sh`** — SHA256-keyed file cache in `~/.cache/holo-polymarket/`. Functions: `cache_get`, `cache_set`, `cache_clear`, `cache_stats`. Sourced by `api.sh`.
 - **`scripts/export.sh`** — CSV/JSON export for time-series commands. Functions: `export_to_csv`, `export_to_json`.
+- **`scripts/signer.py`** — Python EIP-712 order signer. Called by `api.sh` via `$PYTHON_CMD`. Supports `--credentials-stdin` for secure credential passing. Dependencies managed by `pyproject.toml` (installed to `~/.openclaw/.venv` via deploy script).
 
 Data flow pattern: `polymarket.sh` calls `api.sh` fetch function → pipes JSON to `format.sh` formatter. For time-series commands (`history`, `trend`, `volume-trend`), `parse_series_command_args()` handles `--format`/`--out` flags and `export_series_if_needed()` conditionally exports instead of formatting.
 
@@ -46,7 +47,7 @@ Data flow pattern: `polymarket.sh` calls `api.sh` fetch function → pipes JSON 
 Tests use a custom assertion framework defined inline in each test file (`assert_eq`, `assert_not_empty`, `assert_contains`, `assert_gt`, `assert_status`). Test files source the module they test directly.
 
 Two categories:
-- **Unit tests** (no network): `test_format.sh`, `test_format_data.sh`, `test_history_format.sh`, `test_cache.sh`, `test_export.sh` — use mock JSON data
+- **Unit tests** (no network): `test_format.sh`, `test_format_data.sh`, `test_history_format.sh`, `test_cache.sh`, `test_export.sh`, `test_clob.sh` — use mock JSON data
 - **Integration tests** (require network): `test_api.sh`, `test_data_api.sh`, `test_history_api.sh` — call live Polymarket APIs
 
 Each test file exits 0 on all-pass, non-zero on any failure. `run_tests.sh` aggregates results.
@@ -58,12 +59,13 @@ Each test file exits 0 on all-pass, non-zero on any failure. `run_tests.sh` aggr
 - `CACHE_TTL=<seconds>` — override default 60s cache TTL
 - `GAMMA_API_BASE` / `CLOB_API_BASE` / `DATA_API_BASE` — override API endpoints
 - `CURL_TIMEOUT` — HTTP timeout (default 15s)
+- `PYTHON_CMD` — Python interpreter path (default: `$HOME/.openclaw/.venv/bin/python3`, dev override: `uv run python`)
 - Credentials: `POLYMARKET_BEARER_TOKEN` env var or file at `~/.openclaw/credentials/polymarket_credentials`
 
 ## Conventions
 
 - UI language is Chinese (命令输出、错误提示均为中文)
-- Command aliases: `lb` = `leaderboard`, `pos` = `positions`
+- Command aliases: `lb` = `leaderboard`, `pos` = `positions`, `bal` = `balance`
 - All API wrappers go in `api.sh`; all formatters go in `format.sh` — keep separation strict
 - Format functions read JSON from stdin (piped), never take JSON as an argument
 - `SKILL.md` uses `{baseDir}` placeholder for the skill installation path

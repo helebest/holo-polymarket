@@ -9,6 +9,11 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 source "$PROJECT_DIR/scripts/api.sh"
 source "$PROJECT_DIR/scripts/format.sh"
 
+# 开发环境回退: 全局 venv 不存在时使用 uv run python
+if [ ! -x "$PYTHON_CMD" ] && command -v uv >/dev/null 2>&1; then
+    PYTHON_CMD="uv run python"
+fi
+
 PASS=0
 FAIL=0
 SKIP=0
@@ -250,13 +255,13 @@ echo "[T6] signer.py"
 
 if command -v uv >/dev/null 2>&1; then
     # T6.1: --help 能正常执行
-    HELP_OUTPUT=$(uv run python "$PROJECT_DIR/scripts/signer.py" --help 2>&1)
+    HELP_OUTPUT=$($PYTHON_CMD "$PROJECT_DIR/scripts/signer.py" --help 2>&1)
     HELP_STATUS=$?
     assert_status "T6.1 signer.py --help exits 0" 0 "$HELP_STATUS"
 
     # T6.2: 给定测试私钥，输出包含 order 和 signature 的 JSON
     # 使用一个有效的测试私钥和虚拟 token ID
-    SIGNER_OUTPUT=$(uv run python "$PROJECT_DIR/scripts/signer.py" \
+    SIGNER_OUTPUT=$($PYTHON_CMD "$PROJECT_DIR/scripts/signer.py" \
         --private-key "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" \
         --token-id "71321045679252212594626385532706912750332728571942532289631379312455583992563" \
         --price "0.50" --size "10" --side "BUY" \
@@ -306,12 +311,12 @@ echo "[T8] 安全: signer.py stdin 凭据传递"
 
 if command -v uv >/dev/null 2>&1; then
     # T8.1: signer.py 支持 --credentials-stdin 参数
-    HELP_OUTPUT=$(uv run python "$PROJECT_DIR/scripts/signer.py" --help 2>&1)
+    HELP_OUTPUT=$($PYTHON_CMD "$PROJECT_DIR/scripts/signer.py" --help 2>&1)
     assert_contains "T8.1 --credentials-stdin in help" "credentials-stdin" "$HELP_OUTPUT"
 
     # T8.2: 通过 stdin 传递凭据能正常签名
     STDIN_CREDS='{"private_key":"0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80","api_key":"abc123","api_secret":"dGVzdA==","api_passphrase":"test-pass"}'
-    STDIN_OUTPUT=$(echo "$STDIN_CREDS" | uv run python "$PROJECT_DIR/scripts/signer.py" \
+    STDIN_OUTPUT=$(echo "$STDIN_CREDS" | $PYTHON_CMD "$PROJECT_DIR/scripts/signer.py" \
         --credentials-stdin \
         --token-id "71321045679252212594626385532706912750332728571942532289631379312455583992563" \
         --price "0.50" --size "10" --side "BUY" \
@@ -345,7 +350,7 @@ echo "[T9] 安全: signer 错误输出不泄露凭据"
 if command -v uv >/dev/null 2>&1; then
     # T9.1: 给定无效参数，signer.py 输出 JSON 错误（不含 traceback）
     BAD_CREDS='{"private_key":"0xinvalid","api_key":"k","api_secret":"s","api_passphrase":"p"}'
-    ERR_OUTPUT=$(echo "$BAD_CREDS" | uv run python "$PROJECT_DIR/scripts/signer.py" \
+    ERR_OUTPUT=$(echo "$BAD_CREDS" | $PYTHON_CMD "$PROJECT_DIR/scripts/signer.py" \
         --credentials-stdin \
         --token-id "bad-token" \
         --price "0.50" --size "10" --side "BUY" \

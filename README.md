@@ -13,15 +13,16 @@ Polymarket 预测市场工具 — 查询、分析、追踪大户，一站式接�
 - **trades** — 查看任意用户的交易记录
 - **buy** — 开多单（买入）
 - **sell** — 开空单（卖出）
-
-### 规划中
-- ✅ 交易下单（市价单/限价单）
-- ✅ 持仓管理与盈亏追踪
+- **orders** — 查看活跃订单
+- **cancel** — 取消指定订单
+- **cancel-all** — 取消所有订单
+- **balance** — 查看账户余额
 
 ## 前置条件
 
 - `jq` 已安装
 - `curl` 已安装
+- `uv` 已安装（交易功能需要，用于管理 Python 依赖）
 - 网络访问：能够访问 `gamma-api.polymarket.com`
 
 ## 使用方法
@@ -59,6 +60,15 @@ DRY_RUN=1 bash scripts/polymarket.sh buy will-meteora-be-accused-of-insider-trad
 
 # 下单（卖出）
 bash scripts/polymarket.sh sell <event-slug> <outcome> <price> <amount> [order_type]
+
+# 查看活跃订单
+bash scripts/polymarket.sh orders [market-slug]
+
+# 取消订单
+bash scripts/polymarket.sh cancel <order_id>
+
+# 查看账户余额
+bash scripts/polymarket.sh balance [USDC|CONDITIONAL]
 
 # 历史价格（默认 interval=1d）
 bash scripts/polymarket.sh history <event-slug> <from> <to> [interval]
@@ -133,6 +143,7 @@ bash -c 'source scripts/cache.sh && cache_clear'
 
 - **Gamma API**: `https://gamma-api.polymarket.com` — 市场数据、事件查询
 - **Data API**: `https://data-api.polymarket.com` — 排行榜、用户持仓、交易记录
+- **CLOB API**: `https://clob.polymarket.com` — 交易下单（需 HMAC + EIP-712 认证）
 - 文档: https://docs.polymarket.com/developers/gamma-markets-api/overview
 
 ## 作为 OpenClaw 技能使用
@@ -186,12 +197,14 @@ bash tests/run_tests.sh
 
 基于 CLOB Trading API（需要钱包认证）
 
-- [ ] 钱包接入与 API Key 派生
-- [ ] 查看账户持仓与余额
-- [ ] 市价单 / 限价单下单
-- [ ] 订单状态查询与取消
-- [ ] 持仓盈亏追踪
-- [ ] 风控：确认提示、金额上限
+- [x] 凭据管理（API Key、Private Key、HMAC 签名）
+- [x] EIP-712 订单签名（Python signer）
+- [x] 查看账户余额
+- [x] 市价单 / 限价单下单（buy/sell）
+- [x] 订单状态查询与取消（orders/cancel/cancel-all）
+- [x] DRY_RUN 模拟模式
+- [x] 安全加固（stdin 凭据传递、错误脱敏）
+- [x] TDD 测试覆盖（40 项测试）
 
 ### 💡 未来可能
 

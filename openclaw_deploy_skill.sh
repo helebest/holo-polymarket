@@ -9,6 +9,9 @@ set -e
 # Get the directory where this script is located (project root)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Global venv path - use $HOME
+GLOBAL_VENV="$HOME/.openclaw/.venv"
+
 # Check arguments
 if [ $# -lt 1 ]; then
     echo "Usage: $0 <target-path>"
@@ -27,13 +30,32 @@ echo "Deploying Holo Polymarket to: $TARGET_PATH"
 
 # Check dependencies
 echo "Checking dependencies..."
-for cmd in curl jq; do
+for cmd in curl jq uv; do
     if ! command -v "$cmd" &>/dev/null; then
         echo "Error: $cmd is required but not installed"
         exit 1
     fi
     echo "  ✅ $cmd found"
 done
+
+# Read dependencies from pyproject.toml
+echo "Reading dependencies from pyproject.toml..."
+DEPS=$(python3 -c "
+import tomllib
+with open('$SCRIPT_DIR/pyproject.toml', 'rb') as f:
+    data = tomllib.load(f)
+    deps = data.get('project', {}).get('dependencies', [])
+    print(' '.join(deps))
+")
+
+if [ -z "$DEPS" ]; then
+    echo "No dependencies found, skipping installation"
+else
+    echo "Dependencies: $DEPS"
+    # Install to global venv
+    echo "Installing dependencies to global venv..."
+    uv pip install --python "$GLOBAL_VENV/bin/python" $DEPS
+fi
 
 # Create target directory
 mkdir -p "$TARGET_PATH"
@@ -54,6 +76,9 @@ for item in "${DEPLOY_ITEMS[@]}"; do
         echo "Warning: $item not found, skipping"
     fi
 done
+
+# Remove cache
+rm -rf "$TARGET_PATH"/**/__pycache__ 2>/dev/null || true
 
 echo ""
 echo "✅ Deployment complete!"

@@ -69,9 +69,25 @@ bash {baseDir}/scripts/polymarket.sh sell <event-slug> <outcome> <price> <amount
 - `outcome`: Yes 或 No
 - `price`: 价格（0.01-0.99）
 - `amount`: 数量（美元）
-- `order_type`: GTC(默认) | FOK | IOC
+- `order_type`: GTC(默认) | FOK | GTD
 
-⚠️ **重要**: 真实交易需要正确的 CLOB API 认证凭据。使用 `DRY_RUN=1` 模拟测试：
+### 订单管理与余额（CLOB API）
+
+```bash
+# 查看活跃订单
+bash {baseDir}/scripts/polymarket.sh orders [market-slug]
+
+# 取消指定订单
+bash {baseDir}/scripts/polymarket.sh cancel <order_id>
+
+# 取消所有订单
+bash {baseDir}/scripts/polymarket.sh cancel-all
+
+# 查看账户余额
+bash {baseDir}/scripts/polymarket.sh balance [USDC|CONDITIONAL]
+```
+
+⚠️ **重要**: 交易功能需要正确的 CLOB API 认证凭据和 `uv`（Python 包管理器）。使用 `DRY_RUN=1` 模拟测试：
 
 时间范围参数：
 - `from`: 开始日期（`YYYY-MM-DD`）
@@ -124,6 +140,7 @@ bash {baseDir}/scripts/polymarket.sh buy will-meteora-be-accused-of-insider-trad
 
 - `lb` = `leaderboard`
 - `pos` = `positions`
+- `bal` = `balance`
 
 ## 典型工作流
 
@@ -132,6 +149,8 @@ bash {baseDir}/scripts/polymarket.sh buy will-meteora-be-accused-of-insider-trad
 3. `trades <地址>` 查看大户最近交易动向
 4. `detail <slug>` 深入了解某个预测市场
 5. `history/trend/volume-trend` 复盘价格与交易量变化
+6. `buy/sell` 下单交易，`orders` 查看订单状态
+7. `balance` 查看账户余额
 
 ## 缓存
 
