@@ -112,9 +112,11 @@ format_event_detail() {
         else "" end),
         "\n📊 市场选项:\n",
         (
-            .markets | sort_by(- (.outcomePrices | fromjson | .[0] | tonumber))[] |
+            .markets | sort_by(- (if .outcomePrices then (.outcomePrices | fromjson | .[0] | tonumber) else 0 end))[] |
             "  • \(.groupItemTitle // .question): \(
-                (.outcomePrices | fromjson | .[0] | tonumber * 100 * 10 | round / 10 | . * 100 | round / 100 | tostring | if test("\\.") then . else . + ".0" end) + "%"
+                if .outcomePrices then
+                    (.outcomePrices | fromjson | .[0] | tonumber * 100 * 10 | round / 10 | . * 100 | round / 100 | tostring | if test("\\.") then . else . + ".0" end) + "%"
+                else "N/A" end
             ) (24h量: \(
                 if .volume24hr then
                     (.volume24hr | tonumber | if . >= 1000000 then (. / 1000000 * 10 | round / 10 | tostring) + "M"
