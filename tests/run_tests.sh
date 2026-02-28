@@ -30,8 +30,6 @@ run_test_file "$SCRIPT_DIR/test_cache.sh"
 run_test_file "$SCRIPT_DIR/test_history_api.sh"
 run_test_file "$SCRIPT_DIR/test_history_format.sh"
 run_test_file "$SCRIPT_DIR/test_export.sh"
-run_test_file "$SCRIPT_DIR/test_clob.sh"
-
 echo ""
 echo "================================="
 echo "📋 Test Suites: $TOTAL_PASS passed, $TOTAL_FAIL failed"

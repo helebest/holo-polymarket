@@ -2,7 +2,4 @@
 *.tmp
 .DS_Store
 .credentials
-__pycache__/
-.venv/
-*.pyc
 .env

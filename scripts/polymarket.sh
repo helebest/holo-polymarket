@@ -201,194 +201,6 @@ case "$CMD" in
         echo ""
         fetch_trades "$ADDR" "$LIMIT" | format_trades
         ;;
-    buy)
-        # 用法: buy <event-slug> <outcome> <price> <amount> [order_type]
-        # 示例: buy will-meteora-be-accused-insider-trading Yes 0.30 10
-        SLUG="$1"
-        OUTCOME="$2"
-        PRICE="$3"
-        AMOUNT="$4"
-        ORDER_TYPE="${5:-GTC}"
-        
-        if [ -z "$SLUG" ] || [ -z "$OUTCOME" ] || [ -z "$PRICE" ] || [ -z "$AMOUNT" ]; then
-            echo "用法: bash polymarket.sh buy <event-slug> <outcome> <price> <amount> [order_type]"
-            echo "示例: bash polymarket.sh buy will-meteora-be-accused-of-insider-trading Yes 0.30 10"
-            echo ""
-            echo "参数说明:"
-            echo "  event-slug: 事件 slug（从 search 或 detail 获取）"
-            echo "  outcome: Yes 或 No"
-            echo "  price: 价格（0.01-0.99）"
-            echo "  amount: 数量（美元）"
-            echo "  order_type: GTC(默认) | FOK | IOC"
-            exit 1
-        fi
-        
-        echo "🔍 查找市场..."
-        TOKEN_ID=$(get_clob_token_id "$SLUG")
-        if [ -z "$TOKEN_ID" ]; then
-            echo "❌ 未找到市场: $SLUG"
-            exit 1
-        fi
-        
-        # 根据 outcome 确定 side
-        SIDE="BUY"
-        
-        echo "📝 订单确认:"
-        echo "   市场: $SLUG"
-        echo "   方向: $SIDE ($OUTCOME)"
-        echo "   价格: \$$PRICE"
-        echo "   数量: \$$AMOUNT"
-        echo "   类型: $ORDER_TYPE"
-        echo ""
-        
-        # DRY_RUN 模式检查
-        case "${DRY_RUN:-0}" in
-            1)
-                echo "🔸 [DRY RUN] 模拟下单（不发送真实请求）"
-                echo "   market: $SLUG"
-                echo "   side: $SIDE ($OUTCOME)"
-                echo "   price: \$$PRICE"
-                echo "   size: \$$AMOUNT"
-                echo "   order_type: $ORDER_TYPE"
-                echo "   token_id: $TOKEN_ID"
-                echo ""
-                echo "✅ 模拟完成，未发送真实订单"
-                exit 0
-                ;;
-            0) ;;
-            *)
-                echo "❌ 无效的 DRY_RUN 值: $DRY_RUN (应为 0 或 1)"
-                exit 1
-                ;;
-        esac
-        
-        echo "⚠️  确认下单? (输入 'yes' 确认，其他取消)"
-        read -r confirm
-        if [ "$confirm" != "yes" ]; then
-            echo "❌ 已取消"
-            exit 0
-        fi
-        
-        echo "🚀 提交订单..."
-        place_order "$TOKEN_ID" "$PRICE" "$AMOUNT" "$SIDE" "$ORDER_TYPE" | format_order_result
-        ;;
-    sell)
-        # 用法: sell <event-slug> <outcome> <price> <amount> [order_type]
-        # 示例: sell will-meteora-be-accused-insider-trading Yes 0.30 10
-        SLUG="$1"
-        OUTCOME="$2"
-        PRICE="$3"
-        AMOUNT="$4"
-        ORDER_TYPE="${5:-GTC}"
-        
-        if [ -z "$SLUG" ] || [ -z "$OUTCOME" ] || [ -z "$PRICE" ] || [ -z "$AMOUNT" ]; then
-            echo "用法: bash polymarket.sh sell <event-slug> <outcome> <price> <amount> [order_type]"
-            echo "示例: bash polymarket.sh sell will-meteora-be-accused-of-insider-trading Yes 0.30 10"
-            echo ""
-            echo "参数说明:"
-            echo "  event-slug: 事件 slug（从 search 或 detail 获取）"
-            echo "  outcome: Yes 或 No"
-            echo "  price: 价格（0.01-0.99）"
-            echo "  amount: 数量（美元）"
-            echo "  order_type: GTC(默认) | FOK | IOC"
-            exit 1
-        fi
-        
-        echo "🔍 查找市场..."
-        TOKEN_ID=$(get_clob_token_id "$SLUG")
-        if [ -z "$TOKEN_ID" ]; then
-            echo "❌ 未找到市场: $SLUG"
-            exit 1
-        fi
-        
-        # 根据 outcome 确定 side
-        SIDE="SELL"
-        
-        echo "📝 订单确认:"
-        echo "   市场: $SLUG"
-        echo "   方向: $SIDE ($OUTCOME)"
-        echo "   价格: \$$PRICE"
-        echo "   数量: \$$AMOUNT"
-        echo "   类型: $ORDER_TYPE"
-        echo ""
-        
-        # DRY_RUN 模式检查
-        case "${DRY_RUN:-0}" in
-            1)
-                echo "🔸 [DRY RUN] 模拟下单（不发送真实请求）"
-                echo "   market: $SLUG"
-                echo "   side: $SIDE ($OUTCOME)"
-                echo "   price: \$$PRICE"
-                echo "   size: \$$AMOUNT"
-                echo "   order_type: $ORDER_TYPE"
-                echo "   token_id: $TOKEN_ID"
-                echo ""
-                echo "✅ 模拟完成，未发送真实订单"
-                exit 0
-                ;;
-            0) ;;
-            *)
-                echo "❌ 无效的 DRY_RUN 值: $DRY_RUN (应为 0 或 1)"
-                exit 1
-                ;;
-        esac
-        
-        echo "⚠️  确认下单? (输入 'yes' 确认，其他取消)"
-        read -r confirm
-        if [ "$confirm" != "yes" ]; then
-            echo "❌ 已取消"
-            exit 0
-        fi
-        
-        echo "🚀 提交订单..."
-        place_order "$TOKEN_ID" "$PRICE" "$AMOUNT" "$SIDE" "$ORDER_TYPE" | format_order_result
-        ;;
-    orders)
-        MARKET_SLUG="$1"
-        echo "📋 活跃订单"
-        echo ""
-        if [ -n "$MARKET_SLUG" ]; then
-            TOKEN_ID=$(get_clob_token_id "$MARKET_SLUG")
-            if [ -z "$TOKEN_ID" ]; then
-                echo "❌ 未找到市场: $MARKET_SLUG"
-                exit 1
-            fi
-            get_orders "$TOKEN_ID" | format_orders
-        else
-            get_orders | format_orders
-        fi
-        ;;
-    cancel)
-        ORDER_ID="$1"
-        if [ -z "$ORDER_ID" ]; then
-            echo "用法: bash polymarket.sh cancel <order_id>"
-            exit 1
-        fi
-        echo "⚠️  确认取消订单 ${ORDER_ID}? (输入 'yes' 确认，其他取消)"
-        read -r confirm
-        if [ "$confirm" != "yes" ]; then
-            echo "❌ 已取消"
-            exit 0
-        fi
-        echo "🗑️  取消订单..."
-        cancel_order "$ORDER_ID" | format_order_result
-        ;;
-    cancel-all)
-        echo "⚠️  确认取消所有订单? (输入 'yes' 确认，其他取消)"
-        read -r confirm
-        if [ "$confirm" != "yes" ]; then
-            echo "❌ 已取消"
-            exit 0
-        fi
-        echo "🗑️  取消所有订单..."
-        cancel_all_orders | format_order_result
-        ;;
-    balance|bal)
-        ASSET_TYPE="$1"
-        echo "💰 查询余额..."
-        echo ""
-        get_balance "$ASSET_TYPE" | format_balance
-        ;;
     history)
         parse_series_command_args "history" "$@" || exit 1
         SLUG="$SERIES_SLUG"
@@ -479,17 +291,13 @@ case "$CMD" in
         echo "  leaderboard [limit] [pnl|vol] [day|week|month|all]  查看排行榜（默认按盈利，按时间筛选）"
         echo "  positions <地址> [limit]       查看用户持仓"
         echo "  trades <地址> [limit]          查看用户交易记录"
-        echo "  buy <slug> <outcome> <price> <amount> [type]   开多单（买入）"
-        echo "  sell <slug> <outcome> <price> <amount> [type]  开空单（卖出）"
-        echo "  orders [market-slug]                            查看活跃订单"
-        echo "  cancel <order_id>                               取消指定订单"
-        echo "  cancel-all                                      取消所有订单"
-        echo "  balance [USDC|CONDITIONAL]                      查看账户余额"
         echo "  history <slug> <from> <to> [interval] [--format csv|json] [--out 文件]      历史价格"
         echo "  trend <slug> <from> <to> [interval] [--format csv|json] [--out 文件]        概率趋势"
         echo "  volume-trend <slug> <from> <to> [interval] [--format csv|json] [--out 文件] 交易量趋势"
         echo ""
-        echo "别名: lb = leaderboard, pos = positions, bal = balance"
+        echo "别名: lb = leaderboard, pos = positions"
+        echo ""
+        echo "交易功能请使用官方 Polymarket CLI: https://github.com/Polymarket/polymarket-cli"
         echo ""
         echo "示例:"
         echo "  bash polymarket.sh hot 3"
@@ -498,8 +306,6 @@ case "$CMD" in
         echo "  bash polymarket.sh lb 10 pnl week  # 按盈利，周榜 Top10"
         echo "  bash polymarket.sh positions 0xc257ea7e...358e 10"
         echo "  bash polymarket.sh trades 0xc257ea7e...358e 5"
-        echo "  bash polymarket.sh buy will-meteora-be-accused-of-insider-trading Yes 0.30 10"
-        echo "  DRY_RUN=1 bash polymarket.sh buy ...  # 模拟下单"
         echo "  bash polymarket.sh history fed-decision-in-march-885 2025-01-01 2025-01-31 1d"
         exit 1
         ;;

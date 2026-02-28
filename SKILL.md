@@ -1,6 +1,6 @@
 ---
 name: holo-polymarket
-description: Polymarket 预测市场工具。查询热门预测、搜索市场、分析概率趋势、追踪大户持仓、实盘交易下单。
+description: Polymarket 预测市场工具。查询热门预测、搜索市场、分析概率趋势、追踪大户持仓，配合官方 CLI 交易下单。
 homepage: https://github.com/helebest/holo-polymarket
 ---
 
@@ -54,41 +54,6 @@ bash {baseDir}/scripts/polymarket.sh trend <event-slug> <from> <to> [interval]
 bash {baseDir}/scripts/polymarket.sh volume-trend <event-slug> <from> <to> [interval]
 ```
 
-### 交易下单（CLOB API）
-
-```bash
-# 买入（开多）
-bash {baseDir}/scripts/polymarket.sh buy <event-slug> <outcome> <price> <amount> [order_type]
-
-# 卖出（开空）
-bash {baseDir}/scripts/polymarket.sh sell <event-slug> <outcome> <price> <amount> [order_type]
-```
-
-参数说明：
-- `event-slug`: 市场 slug（从 search 或 detail 获取）
-- `outcome`: Yes 或 No
-- `price`: 价格（0.01-0.99）
-- `amount`: 数量（美元）
-- `order_type`: GTC(默认) | FOK | GTD
-
-### 订单管理与余额（CLOB API）
-
-```bash
-# 查看活跃订单
-bash {baseDir}/scripts/polymarket.sh orders [market-slug]
-
-# 取消指定订单
-bash {baseDir}/scripts/polymarket.sh cancel <order_id>
-
-# 取消所有订单
-bash {baseDir}/scripts/polymarket.sh cancel-all
-
-# 查看账户余额
-bash {baseDir}/scripts/polymarket.sh balance [USDC|CONDITIONAL]
-```
-
-⚠️ **重要**: 交易功能需要正确的 CLOB API 认证凭据和 `uv`（Python 包管理器）。使用 `DRY_RUN=1` 模拟测试：
-
 时间范围参数：
 - `from`: 开始日期（`YYYY-MM-DD`）
 - `to`: 结束日期（`YYYY-MM-DD`）
@@ -98,6 +63,31 @@ bash {baseDir}/scripts/polymarket.sh balance [USDC|CONDITIONAL]
 导出参数：
 - `--format csv|json`
 - `--out <文件路径>`（必须与 `--format` 一起使用）
+
+### 交易与余额（官方 Polymarket CLI）
+
+交易功能由官方 [Polymarket CLI](https://github.com/Polymarket/polymarket-cli) 提供，需提前安装并配置钱包。
+
+```bash
+# 查看余额
+polymarket clob balance --asset-type collateral
+polymarket clob balance --asset-type conditional --token <TOKEN_ID>
+
+# 市价单（立即成交）
+polymarket clob market-order --token <TOKEN_ID> --side buy --amount 5
+
+# 限价单（指定价格）
+polymarket clob create-order --token <TOKEN_ID> --side buy --price 0.50 --size 10
+
+# 查看活跃订单
+polymarket clob orders
+
+# 取消订单
+polymarket clob cancel <ORDER_ID>
+polymarket clob cancel-all
+```
+
+TOKEN_ID 获取方式：运行 `detail <event-slug>`，输出中每个选项下方会显示 `Token[Yes]` 和 `Token[No]`，复制对应方向的值即可。
 
 ## 示例
 
@@ -128,19 +118,12 @@ bash {baseDir}/scripts/polymarket.sh trend fed-decision-in-march-885 2025-01-01 
 
 # 交易量趋势并导出 CSV
 bash {baseDir}/scripts/polymarket.sh volume-trend fed-decision-in-march-885 2025-01-01 2025-01-31 --format csv --out /tmp/volume.csv
-
-# 买入预测（模拟测试）
-DRY_RUN=1 bash {baseDir}/scripts/polymarket.sh buy will-meteora-be-accused-of-insider-trading Yes 0.30 10
-
-# 真实买入（会提示确认）
-bash {baseDir}/scripts/polymarket.sh buy will-meteora-be-accused-of-insider-trading Yes 0.30 10
 ```
 
 ## 别名
 
 - `lb` = `leaderboard`
 - `pos` = `positions`
-- `bal` = `balance`
 
 ## 典型工作流
 
@@ -149,8 +132,9 @@ bash {baseDir}/scripts/polymarket.sh buy will-meteora-be-accused-of-insider-trad
 3. `trades <地址>` 查看大户最近交易动向
 4. `detail <slug>` 深入了解某个预测市场
 5. `history/trend/volume-trend` 复盘价格与交易量变化
-6. `buy/sell` 下单交易，`orders` 查看订单状态
-7. `balance` 查看账户余额
+6. `polymarket clob balance` 查看账户余额
+7. `polymarket clob market-order` / `create-order` 下单交易
+8. `polymarket clob orders` 查看订单状态
 
 ## 缓存
 
