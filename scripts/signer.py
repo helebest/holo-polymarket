@@ -55,6 +55,11 @@ def main():
         sys.stdout.write("\n")
         sys.exit(1)
 
+    if not api_key:
+        json.dump({"error": "missing api_key"}, sys.stdout)
+        sys.stdout.write("\n")
+        sys.exit(1)
+
     # Lazy imports — only load heavy crypto libs after arg validation
     from py_clob_client.clob_types import OrderArgs, CreateOrderOptions
     from py_clob_client.constants import POLYGON
@@ -81,9 +86,10 @@ def main():
     signed_order = builder.create_order(order_args, options)
 
     # Build the POST body expected by CLOB /orders endpoint
+    # owner must be api_key (not wallet address) per py-clob-client's order_to_json
     result = {
         "order": signed_order.dict(),
-        "owner": signer.address(),
+        "owner": api_key,
         "orderType": args.order_type,
     }
 
