@@ -82,18 +82,55 @@ clob_get() {
 }
 
 # 读取 Polymarket 凭据（L2 认证用）
+# 凭据文件查找优先级:
+#   1. 环境变量已设置 → 直接使用
+#   2. POLYMARKET_CREDENTIALS_FILE 指定路径
+#   3. $SCRIPT_DIR/../.credentials（项目本地）
+#   4. $HOME/.openclaw/credentials/polymarket_credentials（默认）
 load_clob_credentials() {
-    if [ ! -f "$POLYMARKET_CREDENTIALS_FILE" ]; then
+    # 如果关键环境变量已设置，直接使用
+    if [ -n "${POLY_API_KEY:-}" ] && [ -n "${POLY_SECRET:-}" ]; then
+        return 0
+    fi
+
+    # 确定凭据文件路径
+    local creds_file=""
+    if [ -n "${POLYMARKET_CREDENTIALS_FILE:-}" ]; then
+        # 显式指定了路径，必须存在
+        if [ -f "$POLYMARKET_CREDENTIALS_FILE" ]; then
+            creds_file="$POLYMARKET_CREDENTIALS_FILE"
+        else
+            return 1
+        fi
+    elif [ -f "$SCRIPT_DIR/../.credentials" ]; then
+        creds_file="$SCRIPT_DIR/../.credentials"
+    elif [ -f "$HOME/.openclaw/credentials/polymarket_credentials" ]; then
+        creds_file="$HOME/.openclaw/credentials/polymarket_credentials"
+    else
         return 1
     fi
-    
-    # 读取 API_KEY, SECRET, PASSPHRASE, ADDRESS
-    export POLY_API_KEY=$(grep "^API_KEY=" "$POLYMARKET_CREDENTIALS_FILE" | cut -d'=' -f2)
-    export POLY_SECRET=$(grep "^SECRET=" "$POLYMARKET_CREDENTIALS_FILE" | cut -d'=' -f2)
-    export POLY_PASSPHRASE=$(grep "^PASSPHRASE=" "$POLYMARKET_CREDENTIALS_FILE" | cut -d'=' -f2)
-    # 如果没有 ADDRESS，使用默认地址或从环境变量读取
-    export POLY_ADDRESS="${POLY_ADDRESS:-$(grep "^ADDRESS=" "$POLYMARKET_CREDENTIALS_FILE" | cut -d'=' -f2)}"
-    
+
+    # 用 awk 解析，正确处理值中包含 = 和 shell 元字符的情况
+    # 值用单引号包裹，值内的单引号转义为 '\''
+    eval "$(awk -F= '
+        /^[[:space:]]*#/ { next }
+        /^[[:space:]]*$/ { next }
+        {
+            key=$1
+            # 值为第一个 = 之后的所有内容
+            val=substr($0, index($0,"=")+1)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", val)
+            # 转义值中的单引号
+            gsub(/'\''/, "'\''\\'\'''\''", val)
+            if (key=="API_KEY") printf "export POLY_API_KEY='\''%s'\''\n", val
+            else if (key=="SECRET") printf "export POLY_SECRET='\''%s'\''\n", val
+            else if (key=="PASSPHRASE") printf "export POLY_PASSPHRASE='\''%s'\''\n", val
+            else if (key=="ADDRESS") printf "export POLY_ADDRESS='\''%s'\''\n", val
+            else if (key=="PRIVATE_KEY") printf "export POLY_PRIVATE_KEY='\''%s'\''\n", val
+        }
+    ' "$creds_file")"
+
     if [ -z "$POLY_API_KEY" ] || [ -z "$POLY_SECRET" ]; then
         return 1
     fi
@@ -106,12 +143,19 @@ generate_clob_signature() {
     local path="$2"
     local body="$3"
     local timestamp="$4"
-    
+
     # 构建待签名字符串: timestamp + method + path + body
     local string_to_sign="${timestamp}${method}${path}${body}"
-    
-    # 使用 HMAC-SHA256
-    echo -n "$string_to_sign" | openssl dgst -sha256 -hmac "$POLY_SECRET" -binary | base64
+
+    # base64url → standard base64 → decode → hex key
+    local b64_standard hmac_key_hex
+    b64_standard=$(echo -n "$POLY_SECRET" | tr '_-' '/+')
+    hmac_key_hex=$(echo -n "$b64_standard" | base64 -d | xxd -p | tr -d '\n')
+
+    # HMAC-SHA256 → base64url 编码输出
+    echo -n "$string_to_sign" \
+        | openssl dgst -sha256 -mac HMAC -macopt "hexkey:${hmac_key_hex}" -binary \
+        | base64 | tr '/+' '_-'
 }
 
 # 通用 CLOB API POST 请求（L2 认证）
@@ -306,10 +350,49 @@ get_clob_token_id() {
     echo "$token_id"
 }
 
+# 检查 signer 依赖（uv）
+check_signer_deps() {
+    if ! command -v uv >/dev/null 2>&1; then
+        echo '{"error": "uv 未安装。请先安装: curl -LsSf https://astral.sh/uv/install.sh | sh"}'
+        return 1
+    fi
+}
+
+# 通用 CLOB API GET 请求（L2 HMAC 认证）
+# 用于需要 L2 认证的端点（/orders, /balance-allowance 等）
+# 用法: clob_get_authenticated "/orders" "market=..."
+clob_get_authenticated() {
+    local path="$1"
+    local params="$2"
+    local url="${CLOB_API}${path}"
+
+    if [ -n "$params" ]; then
+        url="${url}?${params}"
+        path="${path}?${params}"
+    fi
+
+    # 加载凭据
+    load_clob_credentials || { echo '{"error": "failed to load credentials"}'; return 1; }
+
+    # 生成认证 headers
+    local timestamp
+    timestamp=$(date +%s)
+    local signature
+    signature=$(generate_clob_signature "GET" "$path" "" "$timestamp")
+
+    curl -s --max-time "$CURL_TIMEOUT" \
+        -H "POLY_ADDRESS: ${POLY_ADDRESS}" \
+        -H "POLY_API_KEY: ${POLY_API_KEY}" \
+        -H "POLY_TIMESTAMP: ${timestamp}" \
+        -H "POLY_SIGNATURE: ${signature}" \
+        -H "POLY_PASSPHRASE: ${POLY_PASSPHRASE}" \
+        "$url"
+}
+
 # 下单（市价单/限价单）
 # 用法: place_order <token_id> <price> <size> <side> [order_type]
 # side: BUY | SELL
-# order_type: GTC (默认) | FOK | IOC
+# order_type: GTC (默认) | FOK | GTD
 place_order() {
     local token_id="$1"
     local price="$2"
@@ -328,20 +411,95 @@ place_order() {
         *) echo '{"error": "side must be BUY or SELL"}'; return 1 ;;
     esac
 
-    # 构建订单 JSON
-    local order_json
-    order_json=$(cat <<EOF
-{
-    "token_id": "$token_id",
-    "price": $price,
-    "size": $size,
-    "side": "$side",
-    "order_type": "$order_type"
-}
-EOF
-)
+    # DRY_RUN 模式: 输出模拟 JSON，不发送请求
+    if [ "${DRY_RUN:-0}" = "1" ]; then
+        printf '{"dry_run":true,"token_id":"%s","price":"%s","size":"%s","side":"%s","order_type":"%s"}\n' \
+            "$token_id" "$price" "$size" "$side" "$order_type"
+        return 0
+    fi
 
-    clob_post "/orders" "$order_json"
+    # 加载凭据
+    load_clob_credentials || { echo '{"error": "failed to load credentials"}'; return 1; }
+
+    # 检查 signer 依赖
+    check_signer_deps || return 1
+
+    # 调用 signer.py 生成 EIP-712 签名订单
+    # 安全: 凭据通过 stdin 传递，不暴露在进程命令行（ps aux 不可见）
+    local creds_json signed_order signer_exit
+    creds_json=$(printf '{"private_key":"%s","api_key":"%s","api_secret":"%s","api_passphrase":"%s"}' \
+        "$POLY_PRIVATE_KEY" "$POLY_API_KEY" "$POLY_SECRET" "$POLY_PASSPHRASE")
+
+    signed_order=$(echo "$creds_json" | uv run python "$SCRIPT_DIR/signer.py" \
+        --credentials-stdin \
+        --token-id "$token_id" \
+        --price "$price" --size "$size" --side "$side" \
+        --order-type "$order_type" --neg-risk "false" \
+        2>/dev/null)
+    signer_exit=$?
+
+    if [ $signer_exit -ne 0 ]; then
+        # 安全: 不暴露 signer 的原始输出，仅返回其 JSON 错误或通用错误
+        if echo "$signed_order" | jq -e '.error' >/dev/null 2>&1; then
+            echo "$signed_order"
+        else
+            echo '{"error": "signer failed"}'
+        fi
+        return 1
+    fi
+
+    clob_post "/orders" "$signed_order"
+}
+
+# 获取活跃订单
+# 用法: get_orders [market_id]
+get_orders() {
+    local market_id="$1"
+    local params=""
+    if [ -n "$market_id" ]; then
+        params="market=${market_id}"
+    fi
+    clob_get_authenticated "/orders" "$params"
+}
+
+# 获取单个订单详情
+# 用法: get_order <order_id>
+get_order() {
+    local order_id="$1"
+    if [ -z "$order_id" ]; then
+        echo '{"error": "missing order_id"}'
+        return 1
+    fi
+    clob_get_authenticated "/orders/${order_id}"
+}
+
+# 取消指定订单
+# 用法: cancel_order <order_id>
+cancel_order() {
+    local order_id="$1"
+    if [ -z "$order_id" ]; then
+        echo '{"error": "missing order_id"}'
+        return 1
+    fi
+    clob_delete "/orders/${order_id}"
+}
+
+# 取消所有订单
+# 用法: cancel_all_orders
+cancel_all_orders() {
+    clob_delete "/orders"
+}
+
+# 获取账户余额
+# 用法: get_balance [asset_type]
+# asset_type: USDC | CONDITIONAL（默认查询所有）
+get_balance() {
+    local asset_type="$1"
+    local params=""
+    if [ -n "$asset_type" ]; then
+        params="asset_type=${asset_type}"
+    fi
+    clob_get_authenticated "/balance-allowance" "$params"
 }
 
 # 验证 interval 参数

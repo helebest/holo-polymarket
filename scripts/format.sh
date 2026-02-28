@@ -350,3 +350,79 @@ format_volume_trend_table() {
         printf "%-12s | %-10s\n" "$day" "$vol"
     done
 }
+
+# ============================================================
+# CLOB Trading 格式化函数
+# ============================================================
+
+# 格式化下单响应
+# 输入: JSON（从 stdin）— 成功时含 orderID/status，失败时含 error
+format_order_result() {
+    local input
+    input=$(cat)
+
+    local err
+    err=$(echo "$input" | jq -r '.error // empty' 2>/dev/null)
+    if [ -n "$err" ]; then
+        echo "❌ 下单失败: $err"
+        return 0
+    fi
+
+    echo "$input" | jq -r '
+        "✅ 订单已提交",
+        "   订单ID: \(.orderID // .order_id // "N/A")",
+        "   状态: \(.status // "N/A")",
+        "   方向: \(.side // "N/A")",
+        "   价格: \(.price // "N/A")",
+        "   数量: \(.size // .original_size // "N/A")",
+        "   类型: \(.type // .order_type // "N/A")"
+    '
+}
+
+# 格式化活跃订单列表
+# 输入: JSON 数组（从 stdin）
+format_orders() {
+    local input
+    input=$(cat)
+    local len
+    len=$(echo "$input" | jq 'if type == "array" then length else 0 end' 2>/dev/null)
+    if [ -z "$len" ] || [ "$len" = "0" ]; then
+        echo "暂无活跃订单"
+        return
+    fi
+    echo "$input" | jq -r '
+        to_entries[] |
+        .key as $i |
+        .value |
+        "\($i + 1). \(.market // "N/A")" +
+        (if .outcome then " [\(.outcome)]" else "" end),
+        "   " +
+        (if .side == "BUY" then "🟢 BUY" else "🔴 SELL" end) +
+        " @ \(.price // "N/A") | 数量: \(.original_size // .size // "N/A")" +
+        " | 已成交: \(.size_matched // "0")" +
+        " | 状态: \(.status // "N/A")" +
+        " | 类型: \(.type // "N/A")",
+        "   ID: \(.id // "N/A")",
+        ""
+    '
+}
+
+# 格式化账户余额
+# 输入: JSON（从 stdin）
+format_balance() {
+    local input
+    input=$(cat)
+
+    local err
+    err=$(echo "$input" | jq -r '.error // empty' 2>/dev/null)
+    if [ -n "$err" ]; then
+        echo "❌ 查询失败: $err"
+        return 0
+    fi
+
+    echo "💰 账户余额"
+    echo "$input" | jq -r '
+        to_entries[] |
+        "   \(.key): \(.value)"
+    '
+}
