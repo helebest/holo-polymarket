@@ -93,7 +93,7 @@ cat > "$TMP_CREDS" <<'CREDS'
 API_KEY=abc123-def456
 SECRET=3WbLfwVsl0Xo1YtwAwRBKVIanrfr_-F8J7bS1y_5m0M=
 PASSPHRASE=my-passphrase
-ADDRESS=0x1234567890abcdef1234567890abcdef12345678
+PRIVATE_ADDRESS=0x1234567890abcdef1234567890abcdef12345678
 PRIVATE_KEY=0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef
 CREDS
 
@@ -108,27 +108,27 @@ trap cleanup EXIT
 echo "[T1] 凭据解析 (load_clob_credentials)"
 
 # 清除可能残留的环境变量
-unset POLY_API_KEY POLY_SECRET POLY_PASSPHRASE POLY_ADDRESS POLY_PRIVATE_KEY
+unset POLY_API_KEY POLY_SECRET POLY_PASSPHRASE POLY_PRIVATE_ADDRESS POLY_PRIVATE_KEY
 
 # T1.1: 正确读取所有字段
 export POLYMARKET_CREDENTIALS_FILE="$TMP_CREDS"
 load_clob_credentials
 assert_eq "T1.1 API_KEY parsed correctly" "abc123-def456" "$POLY_API_KEY"
 assert_eq "T1.2 PASSPHRASE parsed correctly" "my-passphrase" "$POLY_PASSPHRASE"
-assert_eq "T1.3 ADDRESS parsed correctly" "0x1234567890abcdef1234567890abcdef12345678" "$POLY_ADDRESS"
+assert_eq "T1.3 PRIVATE_ADDRESS parsed correctly" "0x1234567890abcdef1234567890abcdef12345678" "$POLY_PRIVATE_ADDRESS"
 assert_eq "T1.4 PRIVATE_KEY parsed correctly" "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef" "$POLY_PRIVATE_KEY"
 
 # T1.2: SECRET 值中的 = 不被截断
 assert_eq "T1.5 SECRET with trailing = preserved" "3WbLfwVsl0Xo1YtwAwRBKVIanrfr_-F8J7bS1y_5m0M=" "$POLY_SECRET"
 
 # T1.3: 值含 shell 元字符时不被破坏
-unset POLY_API_KEY POLY_SECRET POLY_PASSPHRASE POLY_ADDRESS POLY_PRIVATE_KEY
+unset POLY_API_KEY POLY_SECRET POLY_PASSPHRASE POLY_PRIVATE_ADDRESS POLY_PRIVATE_KEY
 TMP_METACHAR="$TMP_DIR/.credentials_meta"
 cat > "$TMP_METACHAR" <<'CREDS'
 API_KEY=key with spaces
 SECRET=sec$ret`val
 PASSPHRASE=pass;phrase
-ADDRESS=0xaddr
+PRIVATE_ADDRESS=0xaddr
 PRIVATE_KEY=0xpk
 CREDS
 POLYMARKET_CREDENTIALS_FILE="$TMP_METACHAR"
@@ -138,13 +138,13 @@ assert_eq "T1.7 value with \$ and backtick preserved" 'sec$ret`val' "$POLY_SECRE
 assert_eq "T1.8 value with semicolon preserved" "pass;phrase" "$POLY_PASSPHRASE"
 
 # T1.4: 凭据文件不存在时返回错误码
-unset POLY_API_KEY POLY_SECRET POLY_PASSPHRASE POLY_ADDRESS POLY_PRIVATE_KEY
+unset POLY_API_KEY POLY_SECRET POLY_PASSPHRASE POLY_PRIVATE_ADDRESS POLY_PRIVATE_KEY
 POLYMARKET_CREDENTIALS_FILE="/nonexistent/path/creds"
 load_clob_credentials 2>/dev/null
 assert_status "T1.9 nonexistent file returns error" 1 "$?"
 
 # T1.4: 项目本地 .credentials 优先于默认路径
-unset POLY_API_KEY POLY_SECRET POLY_PASSPHRASE POLY_ADDRESS POLY_PRIVATE_KEY
+unset POLY_API_KEY POLY_SECRET POLY_PASSPHRASE POLY_PRIVATE_ADDRESS POLY_PRIVATE_KEY
 # 创建项目本地 .credentials
 LOCAL_CREDS="$PROJECT_DIR/.credentials"
 LOCAL_CREDS_EXISTED=0
@@ -156,7 +156,7 @@ cat > "$LOCAL_CREDS" <<'CREDS'
 API_KEY=local-key-123
 SECRET=localSecret==
 PASSPHRASE=local-pass
-ADDRESS=0xlocal
+PRIVATE_ADDRESS=0xlocal
 PRIVATE_KEY=0xlocalkey
 CREDS
 # 清空 POLYMARKET_CREDENTIALS_FILE，让优先级逻辑选择本地文件
@@ -171,7 +171,7 @@ fi
 
 # 恢复
 export POLYMARKET_CREDENTIALS_FILE="$TMP_CREDS"
-unset POLY_API_KEY POLY_SECRET POLY_PASSPHRASE POLY_ADDRESS POLY_PRIVATE_KEY
+unset POLY_API_KEY POLY_SECRET POLY_PASSPHRASE POLY_PRIVATE_ADDRESS POLY_PRIVATE_KEY
 load_clob_credentials
 
 # ============================================================
@@ -380,7 +380,7 @@ if command -v uv >/dev/null 2>&1; then
 
     # T9.5: place_order 失败时也不泄露凭据
     export POLYMARKET_CREDENTIALS_FILE="$TMP_CREDS"
-    unset POLY_API_KEY POLY_SECRET POLY_PASSPHRASE POLY_ADDRESS POLY_PRIVATE_KEY DRY_RUN
+    unset POLY_API_KEY POLY_SECRET POLY_PASSPHRASE POLY_PRIVATE_ADDRESS POLY_PRIVATE_KEY DRY_RUN
     load_clob_credentials
     PLACE_ERR=$(place_order "bad-token" "0.50" "10" "BUY" "GTC" 2>&1)
     assert_not_contains "T9.5 place_order error does not leak private key" "$POLY_PRIVATE_KEY" "$PLACE_ERR"

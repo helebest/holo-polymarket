@@ -126,7 +126,7 @@ load_clob_credentials() {
             if (key=="API_KEY") printf "export POLY_API_KEY='\''%s'\''\n", val
             else if (key=="SECRET") printf "export POLY_SECRET='\''%s'\''\n", val
             else if (key=="PASSPHRASE") printf "export POLY_PASSPHRASE='\''%s'\''\n", val
-            else if (key=="ADDRESS") printf "export POLY_ADDRESS='\''%s'\''\n", val
+            else if (key=="PRIVATE_ADDRESS") printf "export POLY_PRIVATE_ADDRESS='\''%s'\''\n", val
             else if (key=="PRIVATE_KEY") printf "export POLY_PRIVATE_KEY='\''%s'\''\n", val
         }
     ' "$creds_file")"
@@ -174,7 +174,7 @@ clob_post() {
     
     curl -s --max-time "$CURL_TIMEOUT" -X POST \
         -H "Content-Type: application/json" \
-        -H "POLY_ADDRESS: ${POLY_ADDRESS}" \
+        -H "POLY_ADDRESS: ${POLY_PRIVATE_ADDRESS}" \
         -H "POLY_API_KEY: ${POLY_API_KEY}" \
         -H "POLY_TIMESTAMP: ${timestamp}" \
         -H "POLY_SIGNATURE: ${signature}" \
@@ -197,7 +197,7 @@ clob_delete() {
     local signature=$(generate_clob_signature "DELETE" "$path" "" "$timestamp")
     
     curl -s --max-time "$CURL_TIMEOUT" -X DELETE \
-        -H "POLY_ADDRESS: ${POLY_ADDRESS}" \
+        -H "POLY_ADDRESS: ${POLY_PRIVATE_ADDRESS}" \
         -H "POLY_API_KEY: ${POLY_API_KEY}" \
         -H "POLY_TIMESTAMP: ${timestamp}" \
         -H "POLY_SIGNATURE: ${signature}" \
@@ -385,7 +385,7 @@ clob_get_authenticated() {
     signature=$(generate_clob_signature "GET" "$path" "" "$timestamp")
 
     curl -s --max-time "$CURL_TIMEOUT" \
-        -H "POLY_ADDRESS: ${POLY_ADDRESS}" \
+        -H "POLY_ADDRESS: ${POLY_PRIVATE_ADDRESS}" \
         -H "POLY_API_KEY: ${POLY_API_KEY}" \
         -H "POLY_TIMESTAMP: ${timestamp}" \
         -H "POLY_SIGNATURE: ${signature}" \
