@@ -2,6 +2,9 @@
 #
 # 导出工具：支持 CSV/JSON 导出
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/common.sh"
+
 # 校验导出格式
 # 用法: validate_export_format <csv|json>
 validate_export_format() {
@@ -14,31 +17,6 @@ validate_export_format() {
             return 1
             ;;
     esac
-}
-
-# 将时间戳/日期值转换为 YYYY-MM-DD
-_export_series_date() {
-    local raw="$1"
-    if [ -z "$raw" ] || [ "$raw" = "null" ]; then
-        echo "N/A"
-        return
-    fi
-
-    if echo "$raw" | grep -Eq '^[0-9]+$'; then
-        local ts="$raw"
-        if [ "$ts" -gt 9999999999 ] 2>/dev/null; then
-            ts=$((ts / 1000))
-        fi
-        date -u -d "@$ts" +%Y-%m-%d 2>/dev/null || echo "N/A"
-        return
-    fi
-
-    if echo "$raw" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}'; then
-        echo "${raw:0:10}"
-        return
-    fi
-
-    echo "N/A"
 }
 
 # 检测序列值列名（price/volume/value）
@@ -101,7 +79,7 @@ export_to_csv() {
             ] | @tsv
         ' | while IFS=$'\t' read -r raw_time raw_value; do
             local day
-            day=$(_export_series_date "$raw_time")
+            day=$(to_ymd_date "$raw_time")
             printf "%s,%s\n" "$day" "$raw_value"
         done
     } > "$tmp_file" 2>/dev/null || {

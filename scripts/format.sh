@@ -2,6 +2,9 @@
 #
 # 格式化 Polymarket API 响应为可读文本
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/common.sh"
+
 # 格式化钱包地址（截断显示）
 # 0xc257ea7e...fa358e → 0xc257…358e
 format_address() {
@@ -217,31 +220,6 @@ format_trades() {
     '
 }
 
-# 将时间戳/日期值格式化为 YYYY-MM-DD
-_format_series_date() {
-    local raw="$1"
-    if [ -z "$raw" ] || [ "$raw" = "null" ]; then
-        echo "N/A"
-        return
-    fi
-
-    if echo "$raw" | grep -Eq '^[0-9]+$'; then
-        local ts="$raw"
-        if [ "$ts" -gt 9999999999 ] 2>/dev/null; then
-            ts=$((ts / 1000))
-        fi
-        date -u -d "@$ts" +%Y-%m-%d 2>/dev/null || echo "N/A"
-        return
-    fi
-
-    if echo "$raw" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}'; then
-        echo "${raw:0:10}"
-        return
-    fi
-
-    echo "N/A"
-}
-
 # 格式化历史价格表格
 # 输入: JSON 数组（每项至少包含 timestamp/date 和 price/value）
 format_price_history_table() {
@@ -270,7 +248,7 @@ format_price_history_table() {
         ] | @tsv
     ' | while IFS=$'\t' read -r raw_time raw_price; do
         local day prob
-        day=$(_format_series_date "$raw_time")
+        day=$(to_ymd_date "$raw_time")
         prob=$(format_prob "$raw_price")
         printf "%-12s | %-8s\n" "$day" "$prob"
     done
@@ -354,9 +332,8 @@ format_volume_trend_table() {
         ] | @tsv
     ' | while IFS=$'\t' read -r raw_time raw_volume; do
         local day vol
-        day=$(_format_series_date "$raw_time")
+        day=$(to_ymd_date "$raw_time")
         vol=$(format_volume "$raw_volume")
         printf "%-12s | %-10s\n" "$day" "$vol"
     done
 }
-

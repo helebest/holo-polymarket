@@ -6,61 +6,11 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
+source "$SCRIPT_DIR/helpers/assert.sh"
 source "$PROJECT_DIR/scripts/format.sh"
 
 PASS=0
 FAIL=0
-
-assert_eq() {
-    local desc="$1" expected="$2" actual="$3"
-    if [ "$expected" = "$actual" ]; then
-        echo "  ✅ $desc"
-        PASS=$((PASS + 1))
-    else
-        echo "  ❌ $desc"
-        echo "     expected: $expected"
-        echo "     actual:   $actual"
-        FAIL=$((FAIL + 1))
-    fi
-}
-
-assert_contains() {
-    local desc="$1" expected="$2" actual="$3"
-    if echo "$actual" | grep -qF "$expected"; then
-        echo "  ✅ $desc"
-        PASS=$((PASS + 1))
-    else
-        echo "  ❌ $desc"
-        echo "     expected to contain: $expected"
-        echo "     actual: $(echo "$actual" | head -5)"
-        FAIL=$((FAIL + 1))
-    fi
-}
-
-assert_not_contains() {
-    local desc="$1" unexpected="$2" actual="$3"
-    if echo "$actual" | grep -qF "$unexpected"; then
-        echo "  ❌ $desc"
-        echo "     should NOT contain: $unexpected"
-        FAIL=$((FAIL + 1))
-    else
-        echo "  ✅ $desc"
-        PASS=$((PASS + 1))
-    fi
-}
-
-assert_line_count_ge() {
-    local desc="$1" min="$2" actual="$3"
-    local count
-    count=$(echo "$actual" | wc -l)
-    if [ "$count" -ge "$min" ]; then
-        echo "  ✅ $desc (got $count lines)"
-        PASS=$((PASS + 1))
-    else
-        echo "  ❌ $desc (got $count lines, expected >= $min)"
-        FAIL=$((FAIL + 1))
-    fi
-}
 
 echo "=== Data Format Tests ==="
 echo ""

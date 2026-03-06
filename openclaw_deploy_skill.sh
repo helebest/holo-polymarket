@@ -42,6 +42,7 @@ mkdir -p "$TARGET_PATH"
 DEPLOY_ITEMS=(
     "SKILL.md"
     "scripts"
+    "references"
 )
 
 # Copy each item

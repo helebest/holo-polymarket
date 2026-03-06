@@ -6,36 +6,11 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
+source "$SCRIPT_DIR/helpers/assert.sh"
 source "$PROJECT_DIR/scripts/format.sh"
 
 PASS=0
 FAIL=0
-
-assert_eq() {
-    local desc="$1" expected="$2" actual="$3"
-    if [ "$expected" = "$actual" ]; then
-        echo "  ✅ $desc"
-        PASS=$((PASS + 1))
-    else
-        echo "  ❌ $desc"
-        echo "     expected: $expected"
-        echo "     actual:   $actual"
-        FAIL=$((FAIL + 1))
-    fi
-}
-
-assert_contains() {
-    local desc="$1" expected="$2" actual="$3"
-    if echo "$actual" | grep -qF "$expected"; then
-        echo "  ✅ $desc"
-        PASS=$((PASS + 1))
-    else
-        echo "  ❌ $desc"
-        echo "     expected to contain: $expected"
-        echo "     actual: $(echo "$actual" | head -3)"
-        FAIL=$((FAIL + 1))
-    fi
-}
 
 echo "=== Format Tests ==="
 echo ""

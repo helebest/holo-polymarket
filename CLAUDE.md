@@ -4,26 +4,33 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Holo Polymarket is a Bash CLI toolkit for Polymarket prediction markets. It provides market queries, whale tracking, and historical analysis via two Polymarket APIs (Gamma, Data). It is also deployable as an OpenClaw skill.
+Holo Polymarket is a Bash CLI toolkit for Polymarket prediction markets. It provides market queries, whale tracking, and historical analysis via Polymarket APIs (Gamma, Data, CLOB). It is also deployable as an OpenClaw skill.
 
 Language: **Bash**. Dependencies: `curl`, `jq`.
 
 ## Commands
 
 ```bash
-# Run all tests (8 test suites)
+# Run offline tests (default)
 bash tests/run_tests.sh
 
-# Run a single test file
-bash tests/test_format.sh
-bash tests/test_api.sh        # requires network (live API calls)
-bash tests/test_cache.sh      # self-contained, uses temp directory
+# Run offline + live integration tests
+RUN_LIVE_TESTS=1 bash tests/run_tests.sh
 
-# Run end-to-end test (requires network, not in run_tests.sh)
+# Run a single test file
+bash tests/test_api_unit.sh
+bash tests/test_series_args.sh
+bash tests/test_api.sh        # requires network
+bash tests/test_data_api.sh   # requires network
+
+# Run end-to-end live test (not in run_tests.sh)
 bash tests/test_e2e_hot_detail.sh
 
 # Run the CLI
 bash scripts/polymarket.sh <command> [args...]
+
+# Run static checks
+bash scripts/lint.sh
 
 # Deploy as OpenClaw skill
 bash openclaw_deploy_skill.sh ~/.openclaw/skills/polymarket
@@ -31,27 +38,47 @@ bash openclaw_deploy_skill.sh ~/.openclaw/skills/polymarket
 
 ## Architecture
 
-The CLI entry point is `scripts/polymarket.sh`, which sources three modules and dispatches commands via a `case` statement:
+The CLI entry point is `scripts/polymarket.sh`, which sources modules and dispatches commands by domain:
 
-- **`scripts/api.sh`** — All HTTP calls. Two API layers:
-  - `gamma_get()` → Gamma API (`gamma-api.polymarket.com`) — market data, search, event details
-  - `data_get()` → Data API (`data-api.polymarket.com`) — leaderboard, positions, trades, history
-  - Also handles credentials loading (`load_polymarket_bearer_token`) and time-series fetching (`fetch_history_series`)
-- **`scripts/format.sh`** — All output formatting. Receives JSON via stdin pipe, outputs human-readable text. Functions named `format_*` (e.g., `format_hot_events`, `format_leaderboard`, `format_price_history_table`).
-- **`scripts/cache.sh`** — SHA256-keyed file cache in `~/.cache/holo-polymarket/`. Functions: `cache_get`, `cache_set`, `cache_clear`, `cache_stats`. Sourced by `api.sh`.
-- **`scripts/export.sh`** — CSV/JSON export for time-series commands. Functions: `export_to_csv`, `export_to_json`.
+- **`scripts/common.sh`** — Shared helpers:
+  - `require_commands`
+  - `url_encode`
+  - `to_ymd_date`
+  - `date_to_epoch_utc`
+  - `pm_error` / `pm_warn`
+- **`scripts/api.sh`** — All HTTP calls and history-series fetching:
+  - `gamma_get`, `data_get`, `clob_get`
+  - `fetch_*` API wrappers
+  - `fetch_history_series`
+  - credential loading (`load_polymarket_bearer_token`)
+- **`scripts/format.sh`** — Output formatting (stdin JSON -> human-readable text)
+- **`scripts/export.sh`** — CSV/JSON export for time-series commands
+- **`scripts/cache.sh`** — SHA256-keyed file cache in `~/.cache/holo-polymarket/`
+- **`scripts/commands_market.sh`** — `hot/search/detail`
+- **`scripts/commands_whale.sh`** — `leaderboard/positions/trades`
+- **`scripts/commands_series.sh`** — `history/trend/volume-trend`
 
-Data flow pattern: `polymarket.sh` calls `api.sh` fetch function → pipes JSON to `format.sh` formatter. For time-series commands (`history`, `trend`, `volume-trend`), `parse_series_command_args()` handles `--format`/`--out` flags and `export_series_if_needed()` conditionally exports instead of formatting.
+Data flow pattern: CLI command -> API fetch -> formatter (or exporter for series commands).
 
 ## Testing
 
-Tests use a custom assertion framework defined inline in each test file (`assert_eq`, `assert_not_empty`, `assert_contains`, `assert_gt`, `assert_status`). Test files source the module they test directly.
+Tests use a shared assertion helper at `tests/helpers/assert.sh`.
 
 Two categories:
-- **Unit tests** (no network): `test_format.sh`, `test_format_data.sh`, `test_history_format.sh`, `test_cache.sh`, `test_export.sh` — use mock JSON data
-- **Integration tests** (require network): `test_api.sh`, `test_data_api.sh`, `test_history_api.sh` — call live Polymarket APIs
+- **Offline tests** (default in `run_tests.sh`):
+  - `test_format.sh`
+  - `test_format_data.sh`
+  - `test_cache.sh`
+  - `test_history_api.sh`
+  - `test_history_format.sh`
+  - `test_export.sh`
+  - `test_api_unit.sh`
+  - `test_series_args.sh`
+- **Live integration tests** (`RUN_LIVE_TESTS=1`):
+  - `test_api.sh`
+  - `test_data_api.sh`
 
-Each test file exits 0 on all-pass, non-zero on any failure. `run_tests.sh` aggregates results.
+`test_e2e_hot_detail.sh` is a separate live E2E suite and not part of `run_tests.sh`.
 
 ## Environment Variables
 
@@ -59,12 +86,13 @@ Each test file exits 0 on all-pass, non-zero on any failure. `run_tests.sh` aggr
 - `CACHE_TTL=<seconds>` — override default 60s cache TTL
 - `GAMMA_API_BASE` / `CLOB_API_BASE` / `DATA_API_BASE` — override API endpoints
 - `CURL_TIMEOUT` — HTTP timeout (default 15s)
+- `CURL_RETRY` — curl retry count (default 2)
 - Credentials: `POLYMARKET_BEARER_TOKEN` env var or file at `~/.openclaw/credentials/polymarket_credentials`
 
 ## Conventions
 
 - UI language is Chinese (命令输出、错误提示均为中文)
 - Command aliases: `lb` = `leaderboard`, `pos` = `positions`
-- All API wrappers go in `api.sh`; all formatters go in `format.sh` — keep separation strict
+- All API wrappers go in `api.sh`; all formatters go in `format.sh`
 - Format functions read JSON from stdin (piped), never take JSON as an argument
 - `SKILL.md` uses `{baseDir}` placeholder for the skill installation path

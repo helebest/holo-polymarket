@@ -1,55 +1,18 @@
 #!/bin/bash
 #
-# API 模块单元测试
+# API 集成测试（需要网络）
 # 测试 Gamma API 请求和响应解析
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
+source "$SCRIPT_DIR/helpers/assert.sh"
 source "$PROJECT_DIR/scripts/api.sh"
 
 PASS=0
 FAIL=0
 
-assert_eq() {
-    local desc="$1" expected="$2" actual="$3"
-    if [ "$expected" = "$actual" ]; then
-        echo "  ✅ $desc"
-        PASS=$((PASS + 1))
-    else
-        echo "  ❌ $desc"
-        echo "     expected: $expected"
-        echo "     actual:   $actual"
-        FAIL=$((FAIL + 1))
-    fi
-}
-
-assert_not_empty() {
-    local desc="$1" actual="$2"
-    if [ -n "$actual" ] && [ "$actual" != "null" ] && [ "$actual" != "[]" ]; then
-        echo "  ✅ $desc"
-        PASS=$((PASS + 1))
-    else
-        echo "  ❌ $desc (empty or null)"
-        FAIL=$((FAIL + 1))
-    fi
-}
-
-assert_gt() {
-    local desc="$1" value="$2" min="$3"
-    # Handle both integers and floats
-    local result
-    result=$(awk "BEGIN { print ($value > $min) ? 1 : 0 }" 2>/dev/null)
-    if [ "$result" = "1" ]; then
-        echo "  ✅ $desc"
-        PASS=$((PASS + 1))
-    else
-        echo "  ❌ $desc (value=$value, expected > $min)"
-        FAIL=$((FAIL + 1))
-    fi
-}
-
-echo "=== API Tests ==="
+echo "=== API Tests (Live) ==="
 echo ""
 
 # Test 1: fetch_hot_events returns valid JSON array

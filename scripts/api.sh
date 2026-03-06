@@ -4,10 +4,29 @@
 # 所有 API 调用集中在这里，方便测试和替换
 
 GAMMA_API="${GAMMA_API_BASE:-https://gamma-api.polymarket.com}"
+DATA_API="${DATA_API_BASE:-https://data-api.polymarket.com}"
+CLOB_API="${CLOB_API_BASE:-https://clob.polymarket.com}"
 CURL_TIMEOUT="${CURL_TIMEOUT:-15}"
+CURL_RETRY="${CURL_RETRY:-2}"
 POLYMARKET_CREDENTIALS_FILE="${POLYMARKET_CREDENTIALS_FILE:-$HOME/.openclaw/credentials/polymarket_credentials}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/cache.sh"
+source "$SCRIPT_DIR/common.sh"
+
+http_get() {
+    local url="$1"
+    shift || true
+
+    local output
+    output=$(curl -fsS --max-time "$CURL_TIMEOUT" --retry "$CURL_RETRY" --retry-delay 1 --retry-connrefused "$@" "$url" 2>/dev/null)
+    local curl_code=$?
+    if [ "$curl_code" -ne 0 ]; then
+        pm_error "请求失败: ${url} (curl=${curl_code})"
+        return "$curl_code"
+    fi
+
+    printf '%s' "$output"
+}
 
 # 通用 GET 请求
 # 用法: gamma_get "/events" "limit=5&active=true"
@@ -18,7 +37,41 @@ gamma_get() {
     if [ -n "$params" ]; then
         url="${url}?${params}"
     fi
-    curl -s --max-time "$CURL_TIMEOUT" "$url"
+
+    http_get "$url"
+}
+
+# 通用 Data API GET 请求
+# 用法: data_get "/v1/leaderboard" "limit=5"
+data_get() {
+    local path="$1"
+    local params="$2"
+    local url="${DATA_API}${path}"
+    if [ -n "$params" ]; then
+        url="${url}?${params}"
+    fi
+
+    http_get "$url"
+}
+
+# 通用 CLOB API GET 请求（Bearer Token 认证）
+# 用法: clob_get "/prices-history" "market=...&startTs=...&endTs=..."
+clob_get() {
+    local path="$1"
+    local params="$2"
+    local url="${CLOB_API}${path}"
+    local bearer_token
+
+    if [ -n "$params" ]; then
+        url="${url}?${params}"
+    fi
+
+    bearer_token=$(load_polymarket_bearer_token) || {
+        pm_error "缺少 Polymarket Bearer Token，请设置 POLYMARKET_BEARER_TOKEN 或 credentials 文件"
+        return 1
+    }
+
+    http_get "$url" -H "Authorization: Bearer ${bearer_token}"
 }
 
 # 读取 Polymarket Bearer Token（优先环境变量，其次 credentials 文件）
@@ -44,7 +97,7 @@ load_polymarket_bearer_token() {
         /^[[:space:]]*$/ { next }
         {
             k=$1
-            v=$2
+            v=substr($0, index($0, "=") + 1)
             gsub(/^[[:space:]]+|[[:space:]]+$/, "", k)
             gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
             if (k=="BEARER_TOKEN" || k=="TOKEN" || k=="API_KEY") {
@@ -74,54 +127,20 @@ fetch_hot_events() {
 search_events() {
     local query="$1"
     local limit="${2:-5}"
-    # Gamma API 支持 title 模糊搜索 via slug 或用 _q 参数
-    gamma_get "/events" "limit=${limit}&active=true&closed=false&title=${query}"
+    local encoded_query
+
+    encoded_query=$(url_encode "$query") || return 1
+    gamma_get "/events" "limit=${limit}&active=true&closed=false&title=${encoded_query}"
 }
 
 # 获取事件详情（通过 slug）
 # 用法: fetch_event_detail <slug>
 fetch_event_detail() {
     local slug="$1"
-    gamma_get "/events" "slug=${slug}"
-}
+    local encoded_slug
 
-# ============================================================
-# Polymarket Data API 封装
-# Base URL: https://data-api.polymarket.com
-# 公开免费，无需认证
-# ============================================================
-
-DATA_API="${DATA_API_BASE:-https://data-api.polymarket.com}"
-CLOB_API="${CLOB_API_BASE:-https://clob.polymarket.com}"
-
-# 通用 Data API GET 请求
-# 用法: data_get "/v1/leaderboard" "limit=5"
-data_get() {
-    local path="$1"
-    local params="$2"
-    local url="${DATA_API}${path}"
-    if [ -n "$params" ]; then
-        url="${url}?${params}"
-    fi
-    curl -s --max-time "$CURL_TIMEOUT" "$url"
-}
-
-# 通用 CLOB API GET 请求（Bearer Token 认证）
-# 用法: clob_get "/prices-history" "market=...&startTs=...&endTs=..."
-clob_get() {
-    local path="$1"
-    local params="$2"
-    local url="${CLOB_API}${path}"
-    local bearer_token
-
-    if [ -n "$params" ]; then
-        url="${url}?${params}"
-    fi
-
-    bearer_token=$(load_polymarket_bearer_token) || return 1
-    curl -s --max-time "$CURL_TIMEOUT" \
-        -H "Authorization: Bearer ${bearer_token}" \
-        "$url"
+    encoded_slug=$(url_encode "$slug") || return 1
+    gamma_get "/events" "slug=${encoded_slug}"
 }
 
 # 获取排行榜
@@ -133,7 +152,6 @@ fetch_leaderboard() {
     local order_by="${2:-pnl}"
     local time_period="${3:-DAY}"
 
-    # 验证 timePeriod
     case "$time_period" in
         DAY|WEEK|MONTH|ALL) ;;
         *) time_period="DAY" ;;
@@ -149,11 +167,15 @@ fetch_positions() {
     local user="$1"
     local limit="${2:-10}"
     local sort_by="${3:-CASHPNL}"
+    local encoded_user
+
     if [ -z "$user" ]; then
         echo "[]"
         return 1
     fi
-    data_get "/positions" "user=${user}&limit=${limit}&sortBy=${sort_by}&sortDirection=DESC"
+
+    encoded_user=$(url_encode "$user") || return 1
+    data_get "/positions" "user=${encoded_user}&limit=${limit}&sortBy=${sort_by}&sortDirection=DESC"
 }
 
 # 获取用户交易记录
@@ -161,20 +183,24 @@ fetch_positions() {
 fetch_trades() {
     local user="$1"
     local limit="${2:-10}"
+    local encoded_user
+
     if [ -z "$user" ]; then
         echo "[]"
         return 1
     fi
-    data_get "/trades" "user=${user}&limit=${limit}"
+
+    encoded_user=$(url_encode "$user") || return 1
+    data_get "/trades" "user=${encoded_user}&limit=${limit}"
 }
 
-# ==================== Phase 2b: 历史数据与趋势 ====================
+# ==================== 历史数据与趋势 ====================
 
 # 通过市场 slug 获取 CLOB token ID
 # 用法: get_clob_token_id <market_slug>
 get_clob_token_id() {
     local slug="$1"
-    local key cached response token_id
+    local encoded_slug key cached response token_id
 
     if [ -z "$slug" ]; then
         return 1
@@ -186,8 +212,10 @@ get_clob_token_id() {
         return 0
     fi
 
+    encoded_slug=$(url_encode "$slug") || return 1
+
     # 先尝试精确匹配
-    response=$(gamma_get "/markets" "slug=${slug}")
+    response=$(gamma_get "/markets" "slug=${encoded_slug}") || return 1
     token_id=$(echo "$response" | jq -r '
         .[0] // empty |
         (
@@ -203,7 +231,7 @@ get_clob_token_id() {
 
     # 如果精确匹配失败，尝试 search
     if [ -z "$token_id" ] || [ "$token_id" = "null" ]; then
-        response=$(gamma_get "/markets" "search=${slug}&limit=1")
+        response=$(gamma_get "/markets" "search=${encoded_slug}&limit=1") || return 1
         token_id=$(echo "$response" | jq -r '
             .[0] // empty |
             (
@@ -290,11 +318,11 @@ fetch_price_history() {
         return 1
     }
 
-    from_ts=$(date -u -d "${from_date} 00:00:00" +%s 2>/dev/null) || {
+    from_ts=$(date_to_epoch_utc "$from_date" "start") || {
         echo "[]"
         return 1
     }
-    to_ts=$(date -u -d "${to_date} 23:59:59" +%s 2>/dev/null) || {
+    to_ts=$(date_to_epoch_utc "$to_date" "end") || {
         echo "[]"
         return 1
     }
@@ -337,7 +365,11 @@ fetch_price_history() {
             .
           end
         | sort_by(.timestamp)
-    ')
+    ') || {
+        echo "[]"
+        return 1
+    }
+
     if [ -z "$response" ] || [ "$response" = "null" ]; then
         response="[]"
     fi
@@ -353,7 +385,7 @@ fetch_volume_history() {
     local from_date="$2"
     local to_date="$3"
     local interval="${4:-1d}"
-    local params key cached response
+    local encoded_slug params key cached response
 
     if [ -z "$slug" ]; then
         echo "[]"
@@ -368,15 +400,29 @@ fetch_volume_history() {
         return 1
     }
 
-    params="slug=${slug}&from=${from_date}&to=${to_date}&interval=${interval}"
+    encoded_slug=$(url_encode "$slug") || {
+        echo "[]"
+        return 1
+    }
+
+    params="slug=${encoded_slug}&from=${from_date}&to=${to_date}&interval=${interval}"
     key=$(cache_key "history-volume" "$DATA_API" "$params")
     if cached=$(cache_get "$key"); then
         echo "$cached"
         return 0
     fi
 
-    # API skeleton: 统一通过 data-api 获取历史交易量
-    response=$(data_get "/history/volume" "$params")
+    response=$(data_get "/history/volume" "$params") || {
+        echo "[]"
+        return 1
+    }
+
+    if ! echo "$response" | jq -e 'type == "array"' >/dev/null 2>&1; then
+        pm_error "交易量历史接口返回异常，预期为 JSON 数组"
+        echo "[]"
+        return 1
+    fi
+
     cache_set "$key" "$response" "${CACHE_TTL:-60}" >/dev/null 2>&1
     echo "$response"
 }

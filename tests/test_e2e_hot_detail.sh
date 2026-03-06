@@ -8,59 +8,12 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
+source "$SCRIPT_DIR/helpers/assert.sh"
 source "$PROJECT_DIR/scripts/api.sh"
 source "$PROJECT_DIR/scripts/format.sh"
 
 PASS=0
 FAIL=0
-
-assert_eq() {
-    local desc="$1" expected="$2" actual="$3"
-    if [ "$expected" = "$actual" ]; then
-        echo "  ✅ $desc"
-        PASS=$((PASS + 1))
-    else
-        echo "  ❌ $desc"
-        echo "     expected: $expected"
-        echo "     actual:   $actual"
-        FAIL=$((FAIL + 1))
-    fi
-}
-
-assert_not_empty() {
-    local desc="$1" actual="$2"
-    if [ -n "$actual" ] && [ "$actual" != "null" ] && [ "$actual" != "[]" ]; then
-        echo "  ✅ $desc"
-        PASS=$((PASS + 1))
-    else
-        echo "  ❌ $desc (empty or null)"
-        FAIL=$((FAIL + 1))
-    fi
-}
-
-assert_gt() {
-    local desc="$1" value="$2" min="$3"
-    local result
-    result=$(awk "BEGIN { print ($value > $min) ? 1 : 0 }" 2>/dev/null)
-    if [ "$result" = "1" ]; then
-        echo "  ✅ $desc"
-        PASS=$((PASS + 1))
-    else
-        echo "  ❌ $desc (value=$value, expected > $min)"
-        FAIL=$((FAIL + 1))
-    fi
-}
-
-assert_status() {
-    local desc="$1" expected="$2" actual="$3"
-    if [ "$expected" = "$actual" ]; then
-        echo "  ✅ $desc"
-        PASS=$((PASS + 1))
-    else
-        echo "  ❌ $desc (exit code=$actual, expected $expected)"
-        FAIL=$((FAIL + 1))
-    fi
-}
 
 echo "=== E2E Test: hot → detail 流水线 ==="
 echo ""
@@ -91,12 +44,10 @@ for i in "${!SLUG_ARRAY[@]}"; do
     slug="${SLUG_ARRAY[$i]}"
     echo "[Step 3.$((i + 1))] detail: $slug"
 
-    # 获取事件详情
     DETAIL=$(fetch_event_detail "$slug")
     DETAIL_TITLE=$(echo "$DETAIL" | jq -r '.[0].title // empty')
     assert_not_empty "[$slug] 详情有 title" "$DETAIL_TITLE"
 
-    # 管道到 format_event_detail，验证不崩溃
     FORMAT_OUTPUT=$(echo "$DETAIL" | format_event_detail 2>&1)
     FORMAT_EXIT=$?
     assert_status "[$slug] format_event_detail 退出码 0" 0 "$FORMAT_EXIT"

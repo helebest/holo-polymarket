@@ -1,54 +1,18 @@
 #!/bin/bash
 #
-# Data API 集成测试
+# Data API 集成测试（需要网络）
 # 测试 data-api.polymarket.com 的实际请求
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
+source "$SCRIPT_DIR/helpers/assert.sh"
 source "$PROJECT_DIR/scripts/api.sh"
 
 PASS=0
 FAIL=0
 
-assert_eq() {
-    local desc="$1" expected="$2" actual="$3"
-    if [ "$expected" = "$actual" ]; then
-        echo "  ✅ $desc"
-        PASS=$((PASS + 1))
-    else
-        echo "  ❌ $desc"
-        echo "     expected: $expected"
-        echo "     actual:   $actual"
-        FAIL=$((FAIL + 1))
-    fi
-}
-
-assert_not_empty() {
-    local desc="$1" actual="$2"
-    if [ -n "$actual" ] && [ "$actual" != "null" ] && [ "$actual" != "[]" ]; then
-        echo "  ✅ $desc"
-        PASS=$((PASS + 1))
-    else
-        echo "  ❌ $desc (empty or null)"
-        FAIL=$((FAIL + 1))
-    fi
-}
-
-assert_gt() {
-    local desc="$1" value="$2" min="$3"
-    local result
-    result=$(awk "BEGIN { print ($value > $min) ? 1 : 0 }" 2>/dev/null)
-    if [ "$result" = "1" ]; then
-        echo "  ✅ $desc"
-        PASS=$((PASS + 1))
-    else
-        echo "  ❌ $desc (value=$value, expected > $min)"
-        FAIL=$((FAIL + 1))
-    fi
-}
-
-echo "=== Data API Tests ==="
+echo "=== Data API Tests (Live) ==="
 echo ""
 
 # ==================== Leaderboard ====================
@@ -82,7 +46,6 @@ assert_gt "first entry has volume > 0" "$VOL_VAL" 0
 # ==================== Positions ====================
 
 echo "[Test 5] fetch_positions returns valid JSON"
-# Use a known active wallet from leaderboard
 WALLET_ADDR=$(echo "$RESULT" | jq -r '.[0].proxyWallet')
 POS_RESULT=$(fetch_positions "$WALLET_ADDR" 3)
 IS_ARRAY=$(echo "$POS_RESULT" | jq 'type' 2>/dev/null)

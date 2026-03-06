@@ -1,104 +1,67 @@
 # Holo Polymarket
 
-Polymarket 预测市场工具 — 查询、分析、追踪大户，一站式接入全球最大预测市场。
+Polymarket 预测市场 Bash 工具：查询市场、追踪大户、分析历史趋势，并支持 CSV/JSON 导出。
 
 ## 功能
 
-### 已实现
-- **hot** — 查看当前热门预测市场（按24h交易量排序）
-- **search** — 按关键词搜索预测市场
-- **detail** — 查看特定事件的详细概率数据
-- **leaderboard** — 排行榜（按盈利或交易量排名）
-- **positions** — 查看任意用户的当前持仓与盈亏
-- **trades** — 查看任意用户的交易记录
+- `hot`：热门市场（按 24h 交易量）
+- `search`：关键词搜索市场
+- `detail`：事件详情与 `Token[Yes]/Token[No]`
+- `leaderboard` / `lb`：大户榜（盈利/交易量，支持日/周/月/全量）
+- `positions` / `pos`：地址持仓与盈亏
+- `trades`：地址交易记录
+- `history`：历史概率表
+- `trend`：起始/结束/变化摘要
+- `volume-trend`：交易量趋势表
 
 ## 前置条件
 
-- `jq` 已安装
-- `curl` 已安装
-- 网络访问：能够访问 `gamma-api.polymarket.com`
+- `bash`
+- `curl`
+- `jq`
+- 可访问：
+  - `gamma-api.polymarket.com`
+  - `data-api.polymarket.com`
+  - `clob.polymarket.com`
+
+历史价格接口需要 Bearer Token：
+- `POLYMARKET_BEARER_TOKEN`
+- 或 `~/.openclaw/credentials/polymarket_credentials`
 
 ## 使用方法
 
 ```bash
-# 查看热门预测（默认5条）
-bash scripts/polymarket.sh hot [limit]
+# 市场查询
+bash scripts/polymarket.sh hot 5
+bash scripts/polymarket.sh search bitcoin 5
+bash scripts/polymarket.sh detail fed-decision-in-march-885
 
-# 搜索预测市场
-bash scripts/polymarket.sh search <关键词> [limit]
-
-# 查看事件详情
-bash scripts/polymarket.sh detail <event-slug>
-
-# 排行榜（按盈利或交易量，支持时间筛选）
-bash scripts/polymarket.sh leaderboard [limit] [pnl|vol] [day|week|month|all]
-# 按盈利，周榜 Top10
+# 大户追踪
 bash scripts/polymarket.sh lb 10 pnl week
-# 按交易量，月榜 Top5
-bash scripts/polymarket.sh lb 5 vol month
+bash scripts/polymarket.sh pos 0xc257ea7e3a81ca8e16df8935d44d513959fa358e 10
+bash scripts/polymarket.sh trades 0xc257ea7e3a81ca8e16df8935d44d513959fa358e 10
 
-# 查看用户持仓
-bash scripts/polymarket.sh positions <钱包地址> [limit]
-
-# 查看用户交易记录
-bash scripts/polymarket.sh trades <钱包地址> [limit]
-
-# 历史价格（默认 interval=1d）
-bash scripts/polymarket.sh history <event-slug> <from> <to> [interval]
-
-# 概率趋势（汇总起始/结束/变化）
-bash scripts/polymarket.sh trend <event-slug> <from> <to> [interval]
-
-# 交易量趋势
-bash scripts/polymarket.sh volume-trend <event-slug> <from> <to> [interval]
-```
-
-## Phase 2b：历史数据与趋势分析
-
-### 新增命令
-
-```bash
-# 历史价格表格
+# 历史趋势
 bash scripts/polymarket.sh history fed-decision-in-march-885 2025-01-01 2025-01-31 1d
-
-# 概率趋势汇总（支持 1h / 4h / 1d）
 bash scripts/polymarket.sh trend fed-decision-in-march-885 2025-01-01 2025-01-31 4h
-
-# 交易量趋势表格
 bash scripts/polymarket.sh volume-trend fed-decision-in-march-885 2025-01-01 2025-01-31 1d
-```
 
-### 时间范围参数
-
-- `from`: 开始日期，格式 `YYYY-MM-DD`
-- `to`: 结束日期，格式 `YYYY-MM-DD`
-- `interval`: 采样间隔，仅支持 `1h` / `4h` / `1d`，默认 `1d`
-- 在 CLI 中对应位置参数：`<from> <to> [interval]`（语义等同于 `--from` / `--to` / `--interval`）
-
-### 导出功能
-
-支持在 `history` / `trend` / `volume-trend` 中导出结果：
-
-```bash
-# 导出 CSV（自动文件名）
+# 导出
 bash scripts/polymarket.sh history fed-decision-in-march-885 2025-01-01 2025-01-31 --format csv
-
-# 导出 JSON（指定输出路径）
-bash scripts/polymarket.sh trend fed-decision-in-march-885 2025-01-01 2025-01-31 1d --format json --out /tmp/trend.json
+bash scripts/polymarket.sh trend fed-decision-in-march-885 2025-01-01 2025-01-31 --format json --out /tmp/trend.json
 ```
 
-- `--format`: `csv` 或 `json`
-- `--out`: 输出文件路径（仅可与 `--format` 一起使用）
+时间参数：
+- `from/to`：`YYYY-MM-DD`
+- `interval`：`1h` / `4h` / `1d`
 
-### 缓存功能
-
-历史序列请求默认启用本地缓存（默认 TTL 为 60 秒）。
+## 缓存
 
 ```bash
-# 关闭缓存（本次命令）
+# 单次禁用缓存
 NO_CACHE=1 bash scripts/polymarket.sh history fed-decision-in-march-885 2025-01-01 2025-01-31
 
-# 查看缓存统计
+# 缓存统计
 bash -c 'source scripts/cache.sh && cache_stats'
 
 # 清空缓存
@@ -106,79 +69,58 @@ bash -c 'source scripts/cache.sh && cache_clear'
 ```
 
 可选环境变量：
-- `NO_CACHE=1`：禁用读写缓存
-- `CACHE_TTL=<秒>`：自定义缓存过期时间
-- `CACHE_DIR=<目录>`：自定义缓存目录（默认 `~/.cache/holo-polymarket`）
+- `NO_CACHE=1`
+- `CACHE_TTL=<seconds>`
+- `CURL_TIMEOUT=<seconds>`
+- `CURL_RETRY=<count>`
+- `GAMMA_API_BASE` / `DATA_API_BASE` / `CLOB_API_BASE`
 
-## API
-
-基于两个公开免费 API（均无需认证）：
-
-- **Gamma API**: `https://gamma-api.polymarket.com` — 市场数据、事件查询
-- **Data API**: `https://data-api.polymarket.com` — 排行榜、用户持仓、交易记录
-- 文档: https://docs.polymarket.com/developers/gamma-markets-api/overview
-
-## 交易功能
-
-交易下单已由官方 [Polymarket CLI](https://github.com/Polymarket/polymarket-cli) 替代。
-
-## 作为 OpenClaw 技能使用
+## 测试
 
 ```bash
-# 部署到 OpenClaw 技能目录
+# 默认运行离线测试（不依赖外网）
+bash tests/run_tests.sh
+
+# 追加在线集成测试
+RUN_LIVE_TESTS=1 bash tests/run_tests.sh
+
+# 单独运行
+bash tests/test_api_unit.sh
+bash tests/test_series_args.sh
+bash tests/test_api.sh          # 需要网络
+bash tests/test_data_api.sh     # 需要网络
+bash tests/test_e2e_hot_detail.sh # 需要网络
+```
+
+## 静态检查
+
+```bash
+bash scripts/lint.sh
+```
+
+## 作为 OpenClaw Skill 部署
+
+```bash
 bash openclaw_deploy_skill.sh ~/.openclaw/skills/polymarket
 ```
 
-## 开发
+部署内容包括：`SKILL.md`、`scripts/`、`references/`。
 
-```bash
-# 运行测试
-bash tests/run_tests.sh
-```
+## 架构
 
-## 迭代计划
+- `scripts/common.sh`：公共工具（依赖检查、URL 编码、日期转换、统一错误输出）
+- `scripts/api.sh`：API 调用与历史序列获取
+- `scripts/format.sh`：终端输出格式化
+- `scripts/export.sh`：CSV/JSON 导出
+- `scripts/cache.sh`：本地缓存
+- `scripts/commands_market.sh`：`hot/search/detail`
+- `scripts/commands_whale.sh`：`leaderboard/positions/trades`
+- `scripts/commands_series.sh`：`history/trend/volume-trend`
+- `scripts/polymarket.sh`：CLI 入口与路由
 
-### ✅ Phase 1 — 市场数据查询
+## 交易功能
 
-基于 Gamma API（免费、无需认证）
-
-- [x] 热门事件查询（按24h交易量排序）
-- [x] 关键词搜索预测市场
-- [x] 事件详情与概率查看
-- [x] 格式化输出（人类可读）
-- [x] TDD 测试覆盖
-- [x] OpenClaw 技能部署脚本
-
-### ✅ Phase 2a — 大户追踪
-
-基于 Data API（免费、无需认证）
-
-- [x] 排行榜查询（按盈利/交易量排名）
-- [x] 用户持仓查询（任意钱包地址）
-- [x] 用户交易记录查询
-- [x] 格式化输出（盈亏、百分比、时间）
-- [x] TDD 测试覆盖（32 + 19 = 51 项新测试）
-
-### ✅ Phase 2b — 历史数据与分析
-
-基于 Data API
-
-- [x] 历史价格查询（按时间段）
-- [x] 概率趋势变化（日/周/月）
-- [x] 交易量趋势分析
-- [x] 数据导出（CSV/JSON）
-- [x] 本地缓存（减少 API 调用）
-
-### Phase 3 — 交易下单
-
-已由官方 [Polymarket CLI](https://github.com/Polymarket/polymarket-cli) 替代。
-
-### 💡 未来可能
-
-- [ ] 市场创建提醒（新热门事件通知）
-- [ ] 自定义关注列表
-- [ ] 概率异常波动预警
-- [ ] 与 RSS 技能联动（新闻 + 预测概率对比）
+下单/撤单/余额管理请使用官方 [Polymarket CLI](https://github.com/Polymarket/polymarket-cli)。
 
 ## License
 
