@@ -17,8 +17,25 @@ http_get() {
     local url="$1"
     shift || true
 
+    # 自动检测代理环境变量
+    local proxy=""
+    if [ -n "${HTTPS_PROXY:-}" ]; then
+        proxy="$HTTPS_PROXY"
+    elif [ -n "${https_proxy:-}" ]; then
+        proxy="$https_proxy"
+    elif [ -n "${HTTP_PROXY:-}" ]; then
+        proxy="$HTTP_PROXY"
+    elif [ -n "${http_proxy:-}" ]; then
+        proxy="$http_proxy"
+    fi
+
+    local curl_args=(-fsS --max-time "$CURL_TIMEOUT" --retry "$CURL_RETRY" --retry-delay 1 --retry-connrefused "$@")
+    if [ -n "$proxy" ]; then
+        curl_args+=(-x "$proxy")
+    fi
+
     local output
-    output=$(curl -fsS --max-time "$CURL_TIMEOUT" --retry "$CURL_RETRY" --retry-delay 1 --retry-connrefused "$@" "$url" 2>/dev/null)
+    output=$(curl "${curl_args[@]}" "$url" 2>/dev/null)
     local curl_code=$?
     if [ "$curl_code" -ne 0 ]; then
         pm_error "请求失败: ${url} (curl=${curl_code})"
