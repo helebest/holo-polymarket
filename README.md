@@ -38,8 +38,8 @@ bash scripts/polymarket.sh detail fed-decision-in-march-885
 
 # 大户追踪
 bash scripts/polymarket.sh lb 10 pnl week
-bash scripts/polymarket.sh pos 0xc257ea7e3a81ca8e16df8935d44d513959fa358e 10
-bash scripts/polymarket.sh trades 0xc257ea7e3a81ca8e16df8935d44d513959fa358e 10
+bash scripts/polymarket.sh pos 0xc257ea... 10
+bash scripts/polymarket.sh trades 0xc257ea... 10
 
 # 历史趋势
 bash scripts/polymarket.sh history fed-decision-in-march-885 2025-01-01 2025-01-31 1d

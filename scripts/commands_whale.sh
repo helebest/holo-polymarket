@@ -50,14 +50,34 @@ handle_whale_command() {
         positions|pos)
             local addr="$1"
             local limit="${2:-10}"
+            local filter_active=""
+            
+            # 支持 --active 参数过滤未完结 (可在任意位置)
+            if [ "$1" = "--active" ]; then
+                filter_active="yes"
+                addr="$2"
+                limit="${3:-10}"
+            elif [ "$2" = "--active" ]; then
+                filter_active="yes"
+                limit="${3:-10}"
+            elif [ "$3" = "--active" ]; then
+                filter_active="yes"
+            fi
+            
             if [ -z "$addr" ]; then
-                echo "用法: bash polymarket.sh positions <钱包地址> [limit]"
+                echo "用法: bash polymarket.sh positions <钱包地址> [limit] [--active]"
                 return 1
             fi
 
             echo "📊 持仓查询: $(format_address "$addr")"
             echo ""
-            fetch_positions "$addr" "$limit" | format_positions
+            if [ -n "$filter_active" ]; then
+                local now
+                now=$(date +%Y-%m-%d)
+                fetch_positions "$addr" "$limit" | jq --arg now "$now" '[.[] | select(.endDate != "" and .endDate > $now)]' | format_positions
+            else
+                fetch_positions "$addr" "$limit" | format_positions
+            fi
             ;;
         trades)
             local addr="$1"

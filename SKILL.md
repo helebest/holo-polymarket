@@ -47,8 +47,9 @@ bash {baseDir}/scripts/polymarket.sh detail fed-decision-in-march-885
 
 # 3) 大户追踪
 bash {baseDir}/scripts/polymarket.sh lb 10 pnl week
-bash {baseDir}/scripts/polymarket.sh pos 0xc257ea7e3a81ca8e16df8935d44d513959fa358e 10
-bash {baseDir}/scripts/polymarket.sh trades 0xc257ea7e3a81ca8e16df8935d44d513959fa358e 10
+bash {baseDir}/scripts/polymarket.sh pos 0xc257ea... 10
+bash {baseDir}/scripts/polymarket.sh pos 0xc257ea... 10 --active  # 只显示未完结
+bash {baseDir}/scripts/polymarket.sh trades 0xc257ea... 10
 
 # 4) 历史趋势 + 导出
 bash {baseDir}/scripts/polymarket.sh history fed-decision-in-march-885 2025-01-01 2025-01-31 1d

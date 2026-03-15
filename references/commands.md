@@ -31,6 +31,7 @@ bash {baseDir}/scripts/polymarket.sh lb 10 pnl week
 # 持仓（别名 pos）
 bash {baseDir}/scripts/polymarket.sh positions <钱包地址> [limit]
 bash {baseDir}/scripts/polymarket.sh pos 0xabc... 10
+bash {baseDir}/scripts/polymarket.sh pos 0xabc... 10 --active  # 只显示未完结的预测
 
 # 交易记录
 bash {baseDir}/scripts/polymarket.sh trades <钱包地址> [limit]
@@ -82,6 +83,7 @@ bash -c 'source {baseDir}/scripts/cache.sh && cache_clear'
 - `CURL_TIMEOUT=<seconds>`
 - `GAMMA_API_BASE` / `DATA_API_BASE` / `CLOB_API_BASE`
 - `POLYMARKET_BEARER_TOKEN`
+- `HTTP_PROXY` / `HTTPS_PROXY` / `http_proxy` / `https_proxy`（代理）
 
 ## 5. 官方交易 CLI
 
