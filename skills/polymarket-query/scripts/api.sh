@@ -347,6 +347,7 @@ fetch_price_history() {
     local to_date="$3"
     local interval="${4:-1d}"
     local from_ts to_ts bucket token_id params key cached response
+    local max_chunk max_span fidelity chunk_start chunk_end chunk_resp chunk_hist all_points _merged
 
     if [ -z "$slug" ]; then
         echo "[]"
@@ -375,6 +376,15 @@ fetch_price_history() {
         return 1
     }
 
+    # Reject accidentally huge ranges (e.g. a mistyped year) before fanning out
+    # into many sequential chunk requests; ~2 years covers any real market.
+    max_span=$((731 * 86400))
+    if [ $((to_ts - from_ts)) -gt "$max_span" ]; then
+        pm_error "Date range too large (max ~2 years for price history); narrow the range"
+        echo "[]"
+        return 1
+    fi
+
     case "$interval" in
         1h) bucket=3600 ;;
         4h) bucket=14400 ;;
@@ -382,19 +392,51 @@ fetch_price_history() {
         *) echo "[]"; return 1 ;;
     esac
 
-    params="market=${token_id}&startTs=${from_ts}&endTs=${to_ts}&fidelity=1"
-    key=$(cache_key "history-price" "$CLOB_API" "${params}&interval=${interval}")
+    # The CLOB /prices-history endpoint rejects an explicit startTs/endTs span
+    # longer than 15 days (HTTP 400, "interval is too long"), independent of
+    # fidelity and global across markets. Split the range into <=14-day chunks,
+    # fetch each, and stitch them. fidelity is matched to the bucket granularity
+    # (coarser fidelity is always accepted by the API).
+    max_chunk=$((14 * 86400))
+    fidelity=$((bucket / 60))
+    [ "$fidelity" -lt 1 ] && fidelity=1
+
+    key=$(cache_key "history-price" "$CLOB_API" \
+        "market=${token_id}&from=${from_ts}&to=${to_ts}&interval=${interval}")
     if cached=$(cache_get "$key"); then
         echo "$cached"
         return 0
     fi
 
-    response=$(clob_get "/prices-history" "$params") || {
-        echo "[]"
-        return 1
-    }
+    all_points="[]"
+    chunk_start="$from_ts"
+    while [ "$chunk_start" -le "$to_ts" ]; do
+        chunk_end=$((chunk_start + max_chunk))
+        [ "$chunk_end" -gt "$to_ts" ] && chunk_end="$to_ts"
 
-    response=$(echo "$response" | jq -c \
+        params="market=${token_id}&startTs=${chunk_start}&endTs=${chunk_end}&fidelity=${fidelity}"
+        chunk_resp=$(clob_get "/prices-history" "$params") || {
+            echo "[]"
+            return 1
+        }
+        # Always reduce a chunk to an array (a malformed/non-array .history must
+        # not poison the accumulator).
+        chunk_hist=$(echo "$chunk_resp" | jq -c \
+            '(if type == "object" then (.history // []) else (. // []) end)
+             | if type == "array" then . else [] end' 2>/dev/null)
+        if [ -n "$chunk_hist" ] && [ "$chunk_hist" != "null" ]; then
+            # Commit the merge only on success so a jq failure preserves prior data.
+            _merged=$(jq -c -n --argjson a "$all_points" --argjson b "$chunk_hist" \
+                '$a + $b' 2>/dev/null) && all_points="$_merged"
+        fi
+
+        # Stop once this chunk reached the end; otherwise abut the next chunk to
+        # the previous boundary so coverage has no gaps.
+        [ "$chunk_end" -ge "$to_ts" ] && break
+        chunk_start="$chunk_end"
+    done
+
+    response=$(echo "{\"history\":${all_points}}" | jq -c \
         --argjson from "$from_ts" \
         --argjson to "$to_ts" \
         --argjson bucket "$bucket" '
