@@ -1,13 +1,13 @@
 #!/bin/bash
 #
-# API 集成测试（需要网络）
-# 测试 Gamma API 请求和响应解析
+# API integration tests (network required)
+# Tests Gamma API requests and response parsing
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 source "$SCRIPT_DIR/helpers/assert.sh"
-source "$PROJECT_DIR/scripts/api.sh"
+source "$PROJECT_DIR/skills/polymarket-query/scripts/api.sh"
 
 PASS=0
 FAIL=0

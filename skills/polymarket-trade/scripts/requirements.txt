@@ -1,0 +1,6 @@
+# Live order placement / cancellation / balance reads (CLOB V2).
+# Polymarket migrated to CLOB V2 on 2026-04-28; the legacy py-clob-client (v1)
+# is archived and rejected by production. See references/trading.md.
+py-clob-client-v2>=0.1.0
+# Market data, slug -> token resolution, and positions reads.
+requests>=2.28.0

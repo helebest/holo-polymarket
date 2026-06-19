@@ -1,70 +1,77 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+This file provides guidance to coding agents (Codex and compatible) when working in this repository.
 
 ## Project Overview
 
-Holo Polymarket is a Bash CLI toolkit for Polymarket prediction markets. It provides market queries, whale tracking, and historical analysis via two Polymarket APIs (Gamma, Data). It is also deployable as an OpenClaw skill.
+Holo Polymarket packages Polymarket prediction-market Agent Skills for multiple
+runtimes from one canonical `skills/` directory. It is distributed as local
+plugins (Claude Code, Codex, OpenClaw) and as skills (ClawHub, Hermes well-known
+discovery).
 
-Language: **Bash**. Dependencies: `curl`, `jq`.
+Two skills:
+
+- **`polymarket-query`** (Bash; `curl`, `jq`) — read-only research: hot markets,
+  search, event detail, historical price/probability and volume trends, whale
+  leaderboard, address positions, and trade history, with CSV/JSON export.
+- **`polymarket-trade`** (Python; `py-clob-client-v2`, `requests`) — trading via
+  the official CLOB API: buy/sell (market/limit), balance, open orders, cancel.
+  Dry-run by default.
 
 ## Commands
 
 ```bash
-# Run all tests (8 test suites)
-bash tests/run_tests.sh
+uv sync                                    # dev environment
 
-# Run a single test file
-bash tests/test_format.sh
-bash tests/test_api.sh        # requires network (live API calls)
-bash tests/test_cache.sh      # self-contained, uses temp directory
+uv run ruff check .
+uv run ruff format --check .
+uv run holo-polymarket-validate            # repository invariants
+uv run holo-polymarket-sync-plugin --check
+uv run python -m pytest                    # Python tests
+bash tests/run_tests.sh                    # Bash skill tests (offline)
+RUN_LIVE_TESTS=1 bash tests/run_tests.sh   # + live integration tests
 
-# Run end-to-end test (requires network, not in run_tests.sh)
-bash tests/test_e2e_hot_detail.sh
+uv run holo-polymarket-sync-plugin         # regenerate plugin skills copy
+uv run holo-polymarket-build               # build release artifacts (dist/)
 
-# Run the CLI
-bash scripts/polymarket.sh <command> [args...]
-
-# Deploy as OpenClaw skill
-bash openclaw_deploy_skill.sh ~/.openclaw/skills/polymarket
+bash skills/polymarket-query/scripts/polymarket.sh <command> [args...]
+python3 skills/polymarket-trade/scripts/trade.py <command> [args...]
 ```
 
 ## Architecture
 
-The CLI entry point is `scripts/polymarket.sh`, which sources three modules and dispatches commands via a `case` statement:
-
-- **`scripts/api.sh`** — All HTTP calls. Two API layers:
-  - `gamma_get()` → Gamma API (`gamma-api.polymarket.com`) — market data, search, event details
-  - `data_get()` → Data API (`data-api.polymarket.com`) — leaderboard, positions, trades, history
-  - Also handles credentials loading (`load_polymarket_bearer_token`) and time-series fetching (`fetch_history_series`)
-- **`scripts/format.sh`** — All output formatting. Receives JSON via stdin pipe, outputs human-readable text. Functions named `format_*` (e.g., `format_hot_events`, `format_leaderboard`, `format_price_history_table`).
-- **`scripts/cache.sh`** — SHA256-keyed file cache in `~/.cache/holo-polymarket/`. Functions: `cache_get`, `cache_set`, `cache_clear`, `cache_stats`. Sourced by `api.sh`.
-- **`scripts/export.sh`** — CSV/JSON export for time-series commands. Functions: `export_to_csv`, `export_to_json`.
-
-Data flow pattern: `polymarket.sh` calls `api.sh` fetch function → pipes JSON to `format.sh` formatter. For time-series commands (`history`, `trend`, `volume-trend`), `parse_series_command_args()` handles `--format`/`--out` flags and `export_series_if_needed()` conditionally exports instead of formatting.
+- `skills/polymarket-query/scripts/` — Bash modules. `polymarket.sh` routes to
+  `commands_market.sh`/`commands_whale.sh`/`commands_series.sh`; HTTP lives in
+  `api.sh`, formatting in `format.sh` (reads JSON from stdin), caching in
+  `cache.sh`, CSV/JSON export in `export.sh`, shared helpers in `common.sh`.
+- `skills/polymarket-trade/scripts/` — Python. `trade.py` (CLI, dry-run default),
+  `market_data.py` (Gamma resolution, lazy `requests`), `credentials.py`
+  (agent-neutral loading, never prints secrets), `clob.py` (live CLOB adapter
+  over `py-clob-client-v2`, lazy import, version-tolerant dispatch).
+- `src/holo_polymarket/` — `validate.py`, `sync_plugin.py`, `build.py`.
+- Plugin manifests: `plugins/holo-polymarket/.claude-plugin/plugin.json`,
+  `.codex-plugin/plugin.json` (with `interface`), `openclaw.plugin.json`.
+  Marketplaces: `.claude-plugin/marketplace.json` (string source) and
+  `.agents/plugins/marketplace.json` (object source + policy).
 
 ## Testing
 
-Tests use a custom assertion framework defined inline in each test file (`assert_eq`, `assert_not_empty`, `assert_contains`, `assert_gt`, `assert_status`). Test files source the module they test directly.
-
-Two categories:
-- **Unit tests** (no network): `test_format.sh`, `test_format_data.sh`, `test_history_format.sh`, `test_cache.sh`, `test_export.sh` — use mock JSON data
-- **Integration tests** (require network): `test_api.sh`, `test_data_api.sh`, `test_history_api.sh` — call live Polymarket APIs
-
-Each test file exits 0 on all-pass, non-zero on any failure. `run_tests.sh` aggregates results.
-
-## Environment Variables
-
-- `NO_CACHE=1` — bypass cache for a single command
-- `CACHE_TTL=<seconds>` — override default 60s cache TTL
-- `GAMMA_API_BASE` / `CLOB_API_BASE` / `DATA_API_BASE` — override API endpoints
-- `CURL_TIMEOUT` — HTTP timeout (default 15s)
-- Credentials: `POLYMARKET_BEARER_TOKEN` env var or file at `~/.openclaw/credentials/polymarket_credentials`
+- Python tests (`tests/test_repository_layout.py`, `tests/test_trade.py`) run via
+  pytest and cover repo invariants, build artifacts, the docs-are-English check,
+  and the trade CLI's dry-run/confirmation safety model (offline).
+- Bash tests (`tests/*.sh`) source the query skill modules from
+  `skills/polymarket-query/scripts/`. Offline suites run by default;
+  `RUN_LIVE_TESTS=1` adds live API calls.
 
 ## Conventions
 
-- UI language is Chinese (命令输出、错误提示均为中文)
-- Command aliases: `lb` = `leaderboard`, `pos` = `positions`
-- All API wrappers go in `api.sh`; all formatters go in `format.sh` — keep separation strict
-- Format functions read JSON from stdin (piped), never take JSON as an argument
-- `SKILL.md` uses `{baseDir}` placeholder for the skill installation path
+- All documentation, comments, and CLI output are in English.
+- `SKILL.md` `name` must equal the skill directory name; use the `<skill-dir>`
+  placeholder for paths.
+- Bash: keep HTTP in `api.sh` and formatting in `format.sh`; date handling must
+  stay GNU/BSD-portable (`epoch_to_ymd_utc` / `ymd_time_to_epoch_utc`).
+- Credentials are agent-neutral; never hard-code an OpenClaw-only path.
+- Trading is dry-run by default; never execute without `--execute --confirm`.
+- After editing canonical skills, run `holo-polymarket-sync-plugin` and commit the
+  regenerated `plugins/holo-polymarket/skills/` copy. Keep manifest versions, both
+  marketplaces, and `pyproject.toml` in lockstep.

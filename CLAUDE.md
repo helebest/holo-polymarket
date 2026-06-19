@@ -4,95 +4,109 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Holo Polymarket is a Bash CLI toolkit for Polymarket prediction markets. It provides market queries, whale tracking, and historical analysis via Polymarket APIs (Gamma, Data, CLOB). It is also deployable as an OpenClaw skill.
+Holo Polymarket is a multi-runtime Agent Skills repository for Polymarket
+prediction markets. One canonical `skills/` directory is the source of truth and
+is packaged as local plugins (Claude Code, Codex, OpenClaw) and published as
+skills (ClawHub, Hermes well-known discovery).
 
-Language: **Bash**. Dependencies: `curl`, `jq`.
+Two skills:
+
+- **`polymarket-query`** — read-only market research and whale/position tracking.
+  Language: **Bash** (`curl`, `jq`).
+- **`polymarket-trade`** — trading via the official CLOB API (buy/sell/balance/
+  orders/cancel), dry-run by default. Language: **Python** (`py-clob-client-v2`,
+  `requests`).
+
+Distribution tooling lives in `src/holo_polymarket/` (Python, run via `uv`).
 
 ## Commands
 
 ```bash
-# Run offline tests (default)
-bash tests/run_tests.sh
+# Dev environment
+uv sync
 
-# Run offline + live integration tests
-RUN_LIVE_TESTS=1 bash tests/run_tests.sh
+# Quality gate (matches CI)
+uv run ruff check .
+uv run ruff format --check .
+uv run holo-polymarket-validate            # cross-runtime repo invariants
+uv run holo-polymarket-sync-plugin --check # generated plugin copy in sync
+uv run python -m pytest                    # Python tests (repo layout + trade)
+bash tests/run_tests.sh                    # Bash skill tests (offline)
+RUN_LIVE_TESTS=1 bash tests/run_tests.sh   # + live API integration tests
 
-# Run a single test file
-bash tests/test_api_unit.sh
-bash tests/test_series_args.sh
-bash tests/test_api.sh        # requires network
-bash tests/test_data_api.sh   # requires network
+# Regenerate the committed plugin skills copy after editing canonical skills
+uv run holo-polymarket-sync-plugin
 
-# Run end-to-end live test (not in run_tests.sh)
-bash tests/test_e2e_hot_detail.sh
+# Build release artifacts into dist/ (skill/plugin zips + well-known indexes)
+uv run holo-polymarket-build
 
-# Run the CLI
-bash scripts/polymarket.sh <command> [args...]
-
-# Run static checks
-bash scripts/lint.sh
-
-# Deploy as OpenClaw skill
-bash openclaw_deploy_skill.sh ~/.openclaw/skills/polymarket
+# Run the skills directly
+bash skills/polymarket-query/scripts/polymarket.sh <command> [args...]
+python3 skills/polymarket-trade/scripts/trade.py <command> [args...]
 ```
 
 ## Architecture
 
-The CLI entry point is `scripts/polymarket.sh`, which sources modules and dispatches commands by domain:
+### polymarket-query (Bash)
 
-- **`scripts/common.sh`** — Shared helpers:
-  - `require_commands`
-  - `url_encode`
-  - `to_ymd_date`
-  - `date_to_epoch_utc`
-  - `pm_error` / `pm_warn`
-- **`scripts/api.sh`** — All HTTP calls and history-series fetching:
-  - `gamma_get`, `data_get`, `clob_get`
-  - `fetch_*` API wrappers
-  - `fetch_history_series`
-  - credential loading (`load_polymarket_bearer_token`)
-- **`scripts/format.sh`** — Output formatting (stdin JSON -> human-readable text)
-- **`scripts/export.sh`** — CSV/JSON export for time-series commands
-- **`scripts/cache.sh`** — SHA256-keyed file cache in `~/.cache/holo-polymarket/`
-- **`scripts/commands_market.sh`** — `hot/search/detail`
-- **`scripts/commands_whale.sh`** — `leaderboard/positions/trades`
-- **`scripts/commands_series.sh`** — `history/trend/volume-trend`
+Entry point `skills/polymarket-query/scripts/polymarket.sh` sources modules and
+dispatches by domain:
 
-Data flow pattern: CLI command -> API fetch -> formatter (or exporter for series commands).
+- `common.sh` — shared helpers (`require_commands`, `url_encode`, portable
+  GNU/BSD date conversion, `pm_error`/`pm_warn`).
+- `api.sh` — all HTTP calls (`gamma_get`/`data_get`/`clob_get`), history-series
+  fetching, agent-neutral credential resolution (`_pm_resolve_credentials_file`,
+  `load_polymarket_bearer_token`).
+- `format.sh` — output formatting (reads JSON from stdin, never as an argument).
+- `export.sh` — CSV/JSON export for time-series commands.
+- `cache.sh` — SHA256-keyed file cache under `~/.cache/holo-polymarket/`.
+- `commands_market.sh` / `commands_whale.sh` / `commands_series.sh` — command
+  handlers (`hot/search/detail`, `leaderboard/positions/trades`,
+  `history/trend/volume-trend`).
 
-## Testing
+### polymarket-trade (Python)
 
-Tests use a shared assertion helper at `tests/helpers/assert.sh`.
+`skills/polymarket-trade/scripts/`:
 
-Two categories:
-- **Offline tests** (default in `run_tests.sh`):
-  - `test_format.sh`
-  - `test_format_data.sh`
-  - `test_cache.sh`
-  - `test_history_api.sh`
-  - `test_history_format.sh`
-  - `test_export.sh`
-  - `test_api_unit.sh`
-  - `test_series_args.sh`
-- **Live integration tests** (`RUN_LIVE_TESTS=1`):
-  - `test_api.sh`
-  - `test_data_api.sh`
+- `trade.py` — argparse CLI. Orders are dry-run by default; executing requires
+  `--execute` plus a matching `--confirm <token>` (a deterministic hash of the
+  order parameters). Read commands and dry-run previews need no third-party
+  packages.
+- `market_data.py` — Gamma API market resolution (slug → token ids, tick size,
+  min size, neg-risk, indicative prices). `requests` imported lazily.
+- `credentials.py` — agent-neutral credential loading; never prints secrets.
+- `clob.py` — live CLOB adapter over `py-clob-client-v2`, imported lazily, with
+  version-tolerant method dispatch.
 
-`test_e2e_hot_detail.sh` is a separate live E2E suite and not part of `run_tests.sh`.
+### Distribution tooling (`src/holo_polymarket/`)
 
-## Environment Variables
-
-- `NO_CACHE=1` — bypass cache for a single command
-- `CACHE_TTL=<seconds>` — override default 60s cache TTL
-- `GAMMA_API_BASE` / `CLOB_API_BASE` / `DATA_API_BASE` — override API endpoints
-- `CURL_TIMEOUT` — HTTP timeout (default 15s)
-- `CURL_RETRY` — curl retry count (default 2)
-- Credentials: `POLYMARKET_BEARER_TOKEN` env var or file at `~/.openclaw/credentials/polymarket_credentials`
+- `validate.py` — enforces cross-runtime invariants (skill names/frontmatter,
+  manifest versions, Claude string source vs Codex object source, generated
+  plugin copy). Language-aware: only Python skills require `requirements.txt`.
+- `sync_plugin.py` — regenerates `plugins/holo-polymarket/skills/` from `skills/`.
+- `build.py` — skill/plugin archives + AgentSkills 0.2.0 well-known indexes
+  (with per-skill `digest`) + checksums.
 
 ## Conventions
 
-- UI language is Chinese (命令输出、错误提示均为中文)
-- Command aliases: `lb` = `leaderboard`, `pos` = `positions`
-- All API wrappers go in `api.sh`; all formatters go in `format.sh`
-- Format functions read JSON from stdin (piped), never take JSON as an argument
-- `SKILL.md` uses `{baseDir}` placeholder for the skill installation path
+- **All documentation and code comments are in English.** CLI output is English.
+- Each skill's `SKILL.md` `name` must equal its directory name and uses the
+  `<skill-dir>` placeholder for paths.
+- Bash query skill: all HTTP in `api.sh`, all formatting in `format.sh`; format
+  functions read JSON from stdin.
+- Credentials are agent-neutral (env → `$POLYMARKET_CREDENTIALS_FILE` →
+  `./.credentials` → `~/.config/holo-polymarket/credentials` →
+  `~/.openclaw/...`); never hard-code an OpenClaw-only path.
+- Trading is dry-run by default; never execute without `--execute --confirm`.
+- After editing canonical skills, run `holo-polymarket-sync-plugin` and commit the
+  regenerated `plugins/holo-polymarket/skills/` copy.
+- Keep manifest versions, both marketplaces, and `pyproject.toml` in lockstep.
+
+## Environment variables
+
+- Query: `NO_CACHE`, `CACHE_TTL`, `CURL_TIMEOUT`, `CURL_RETRY`,
+  `GAMMA_API_BASE`/`DATA_API_BASE`/`CLOB_API_BASE`, `POLYMARKET_BEARER_TOKEN`,
+  `HTTP(S)_PROXY` (auto-detected).
+- Trade: `POLYMARKET_PRIVATE_KEY`, `POLYMARKET_API_KEY`/`..._API_SECRET`/
+  `..._API_PASSPHRASE`, `POLYMARKET_FUNDER`, `POLYMARKET_SIGNATURE_TYPE`,
+  `POLYMARKET_CREDENTIALS_FILE`, `POLYMARKET_CLOB_HOST`, `POLYMARKET_CHAIN_ID`.

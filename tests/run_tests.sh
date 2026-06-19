@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# 运行测试（默认离线；RUN_LIVE_TESTS=1 时追加在线集成测试）
+# Run tests (offline by default; with RUN_LIVE_TESTS=1 also run live integration tests)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -23,7 +23,7 @@ echo "🧪 Running Holo Polymarket Tests"
 echo "================================="
 echo "Mode: offline"
 
-# 离线测试（必跑）
+# Offline tests (always run)
 run_test_file "$SCRIPT_DIR/test_format.sh"
 run_test_file "$SCRIPT_DIR/test_format_data.sh"
 run_test_file "$SCRIPT_DIR/test_cache.sh"
@@ -33,7 +33,7 @@ run_test_file "$SCRIPT_DIR/test_export.sh"
 run_test_file "$SCRIPT_DIR/test_api_unit.sh"
 run_test_file "$SCRIPT_DIR/test_series_args.sh"
 
-# 在线集成测试（可选）
+# Live integration tests (optional)
 if [ "${RUN_LIVE_TESTS:-0}" = "1" ]; then
     echo ""
     echo "Mode: live API"

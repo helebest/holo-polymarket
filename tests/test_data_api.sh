@@ -1,13 +1,13 @@
 #!/bin/bash
 #
-# Data API 集成测试（需要网络）
-# 测试 data-api.polymarket.com 的实际请求
+# Data API integration tests (network required)
+# Tests live requests against data-api.polymarket.com
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 source "$SCRIPT_DIR/helpers/assert.sh"
-source "$PROJECT_DIR/scripts/api.sh"
+source "$PROJECT_DIR/skills/polymarket-query/scripts/api.sh"
 
 PASS=0
 FAIL=0

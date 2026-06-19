@@ -1,13 +1,13 @@
 #!/bin/bash
 #
-# 格式化模块单元测试
-# 使用 mock 数据测试输出格式
+# Format module unit tests
+# Uses mock data to test output formatting
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 source "$SCRIPT_DIR/helpers/assert.sh"
-source "$PROJECT_DIR/scripts/format.sh"
+source "$PROJECT_DIR/skills/polymarket-query/scripts/format.sh"
 
 PASS=0
 FAIL=0
