@@ -32,6 +32,7 @@ run_test_file "$SCRIPT_DIR/test_history_format.sh"
 run_test_file "$SCRIPT_DIR/test_export.sh"
 run_test_file "$SCRIPT_DIR/test_api_unit.sh"
 run_test_file "$SCRIPT_DIR/test_series_args.sh"
+run_test_file "$SCRIPT_DIR/test_price_history_chunking.sh"
 
 # Live integration tests (optional)
 if [ "${RUN_LIVE_TESTS:-0}" = "1" ]; then
