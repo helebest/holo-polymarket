@@ -1,13 +1,13 @@
 #!/bin/bash
 #
-# Data API 格式化模块单元测试
-# 使用 mock 数据测试 leaderboard / positions / trades 输出格式
+# Data API format module unit tests
+# Uses mock data to test leaderboard / positions / trades output formatting
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 source "$SCRIPT_DIR/helpers/assert.sh"
-source "$PROJECT_DIR/scripts/format.sh"
+source "$PROJECT_DIR/skills/polymarket-query/scripts/format.sh"
 
 PASS=0
 FAIL=0
@@ -40,7 +40,7 @@ assert_contains "shows truncated wallet" "0xc257…" "$OUTPUT"
 
 echo "[Test 4] format_leaderboard - empty list"
 EMPTY_OUTPUT=$(echo '[]' | format_leaderboard)
-assert_contains "empty message" "暂无数据" "$EMPTY_OUTPUT"
+assert_contains "empty message" "No data" "$EMPTY_OUTPUT"
 
 # ==================== Positions ====================
 
@@ -62,7 +62,7 @@ assert_contains "loss indicator" "📉" "$OUTPUT"
 
 echo "[Test 7] format_positions - empty positions"
 EMPTY_OUTPUT=$(echo '[]' | format_positions)
-assert_contains "empty message" "暂无持仓" "$EMPTY_OUTPUT"
+assert_contains "empty message" "No positions" "$EMPTY_OUTPUT"
 
 # ==================== Trades ====================
 
@@ -73,14 +73,14 @@ MOCK_TRADES='[
 ]'
 OUTPUT=$(echo "$MOCK_TRADES" | format_trades)
 assert_contains "shows trade title" "Bitcoin to 100K" "$OUTPUT"
-assert_contains "shows BUY side" "买入" "$OUTPUT"
-assert_contains "shows SELL side" "卖出" "$OUTPUT"
+assert_contains "shows BUY side" "Buy" "$OUTPUT"
+assert_contains "shows SELL side" "Sell" "$OUTPUT"
 assert_contains "shows price" "0.72" "$OUTPUT"
 assert_contains "shows size" "500" "$OUTPUT"
 
 echo "[Test 9] format_trades - empty trades"
 EMPTY_OUTPUT=$(echo '[]' | format_trades)
-assert_contains "empty message" "暂无交易" "$EMPTY_OUTPUT"
+assert_contains "empty message" "No trades" "$EMPTY_OUTPUT"
 
 echo "[Test 10] format_trades - shows time with hours"
 assert_contains "shows date" "2025" "$OUTPUT"

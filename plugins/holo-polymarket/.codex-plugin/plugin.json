@@ -1,0 +1,31 @@
+{
+  "name": "holo-polymarket",
+  "version": "0.1.0",
+  "description": "Query Polymarket prediction markets and trade via the official CLOB API.",
+  "author": {
+    "name": "holo",
+    "url": "https://github.com/helebest"
+  },
+  "homepage": "https://github.com/helebest/holo-polymarket",
+  "repository": "https://github.com/helebest/holo-polymarket",
+  "license": "MIT",
+  "keywords": ["polymarket", "prediction-markets", "trading", "clob", "skills"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "holo-polymarket",
+    "shortDescription": "Query and trade Polymarket prediction markets.",
+    "longDescription": "Skills for Polymarket prediction-market research (hot markets, keyword search, event detail and tokens, historical price/probability and volume trends, whale leaderboard, address positions and trades) and trading through the official CLOB API (dry-run-by-default buy/sell, collateral balance, open orders, and cancellation).",
+    "developerName": "holo",
+    "category": "Finance",
+    "capabilities": ["Read", "Automation"],
+    "websiteURL": "https://github.com/helebest/holo-polymarket",
+    "privacyPolicyURL": "https://github.com/helebest/holo-polymarket/blob/main/PRIVACY.md",
+    "termsOfServiceURL": "https://github.com/helebest/holo-polymarket/blob/main/LICENSE",
+    "defaultPrompt": [
+      "Show the hottest Polymarket markets right now.",
+      "What are the current odds for this event on Polymarket?",
+      "Preview a Polymarket buy order for this market."
+    ],
+    "brandColor": "#1652F0"
+  }
+}

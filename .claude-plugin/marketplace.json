@@ -1,0 +1,25 @@
+{
+  "name": "holo-polymarket",
+  "owner": {
+    "name": "holo",
+    "url": "https://github.com/helebest/holo-polymarket"
+  },
+  "metadata": {
+    "description": "Polymarket prediction-market query and official CLOB API trading Agent Skills.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "holo-polymarket",
+      "source": "./plugins/holo-polymarket",
+      "description": "Query Polymarket prediction markets and trade via the official CLOB API.",
+      "version": "0.1.0",
+      "author": {
+        "name": "holo"
+      },
+      "license": "MIT",
+      "keywords": ["polymarket", "prediction-markets", "trading", "clob", "skills"],
+      "category": "Finance"
+    }
+  ]
+}

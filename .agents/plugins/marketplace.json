@@ -1,0 +1,20 @@
+{
+  "name": "holo-polymarket",
+  "interface": {
+    "displayName": "holo-polymarket"
+  },
+  "plugins": [
+    {
+      "name": "holo-polymarket",
+      "source": {
+        "source": "local",
+        "path": "./plugins/holo-polymarket"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Finance"
+    }
+  ]
+}

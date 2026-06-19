@@ -1,12 +1,12 @@
 #!/bin/bash
 #
-# Cache 模块单元测试
+# Cache module unit tests
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 source "$SCRIPT_DIR/helpers/assert.sh"
-source "$PROJECT_DIR/scripts/cache.sh"
+source "$PROJECT_DIR/skills/polymarket-query/scripts/cache.sh"
 
 PASS=0
 FAIL=0

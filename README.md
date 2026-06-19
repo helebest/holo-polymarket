@@ -1,126 +1,154 @@
 # Holo Polymarket
 
-Polymarket 预测市场 Bash 工具：查询市场、追踪大户、分析历史趋势，并支持 CSV/JSON 导出。
+Agent Skills for Polymarket prediction markets — research and trading — packaged
+as local plugins for Claude Code, Codex, and OpenClaw, and published as skills
+through ClawHub and Hermes-compatible discovery.
 
-## 功能
+The repository ships two skills from one canonical `skills/` source of truth:
 
-- `hot`：热门市场（按 24h 交易量）
-- `search`：关键词搜索市场
-- `detail`：事件详情与 `Token[Yes]/Token[No]`
-- `leaderboard` / `lb`：大户榜（盈利/交易量，支持日/周/月/全量）
-- `positions` / `pos`：地址持仓与盈亏
-- `trades`：地址交易记录
-- `history`：历史概率表
-- `trend`：起始/结束/变化摘要
-- `volume-trend`：交易量趋势表
+| Skill | Purpose |
+| --- | --- |
+| [`polymarket-query`](skills/polymarket-query/SKILL.md) | Read-only research: hot markets, search, event detail, historical price/probability and volume trends, whale leaderboard, address positions and trade history, with CSV/JSON export. (Bash + `curl`/`jq`.) |
+| [`polymarket-trade`](skills/polymarket-trade/SKILL.md) | Trade via the official CLOB API: buy/sell (market or limit), balance, open orders, cancel. Dry-run by default with explicit confirmation. (Python.) |
 
-## 前置条件
+## Repository layout
 
-- `bash`
-- `curl`
-- `jq`
-- 可访问：
-  - `gamma-api.polymarket.com`
-  - `data-api.polymarket.com`
-  - `clob.polymarket.com`
+| Path | Purpose |
+| --- | --- |
+| `skills/` | Canonical Agent Skills (source of truth): `SKILL.md` + `scripts/` + `references/`. |
+| `plugins/holo-polymarket/` | Shared plugin wrapper for Claude Code, Codex, and OpenClaw, with a generated `skills/` copy. |
+| `.claude-plugin/marketplace.json` | Claude Code marketplace (local plugin `source` is a string path). |
+| `.agents/plugins/marketplace.json` | Codex marketplace (`source` object + `policy`). |
+| `registry/` | ClawHub/OpenClaw and Hermes publication notes plus the well-known discovery template. |
+| `src/holo_polymarket/` | Validation, plugin sync, and release-artifact build tooling. |
+| `tests/` | Bash skill tests (offline + live) and Python repository/trade tests. |
+| `dist/` | Generated release artifacts (gitignored). |
 
-历史价格接口需要 Bearer Token：
-- `POLYMARKET_BEARER_TOKEN`
-- 或 `~/.openclaw/credentials/polymarket_credentials`
+The copy under `plugins/holo-polymarket/skills/` is generated from `skills/` by
+`holo-polymarket-sync-plugin` and committed alongside the wrapper. Do not edit it
+by hand.
 
-## 使用方法
+## Install
 
-```bash
-# 市场查询
-bash scripts/polymarket.sh hot 5
-bash scripts/polymarket.sh search bitcoin 5
-bash scripts/polymarket.sh detail fed-decision-in-march-885
+### Claude Code
 
-# 大户追踪
-bash scripts/polymarket.sh lb 10 pnl week
-bash scripts/polymarket.sh pos 0xc257ea... 10
-bash scripts/polymarket.sh trades 0xc257ea... 10
-
-# 历史趋势
-bash scripts/polymarket.sh history fed-decision-in-march-885 2025-01-01 2025-01-31 1d
-bash scripts/polymarket.sh trend fed-decision-in-march-885 2025-01-01 2025-01-31 4h
-bash scripts/polymarket.sh volume-trend fed-decision-in-march-885 2025-01-01 2025-01-31 1d
-
-# 导出
-bash scripts/polymarket.sh history fed-decision-in-march-885 2025-01-01 2025-01-31 --format csv
-bash scripts/polymarket.sh trend fed-decision-in-march-885 2025-01-01 2025-01-31 --format json --out /tmp/trend.json
+```text
+/plugin marketplace add helebest/holo-polymarket
+/plugin install holo-polymarket@holo-polymarket
 ```
 
-时间参数：
-- `from/to`：`YYYY-MM-DD`
-- `interval`：`1h` / `4h` / `1d`
+Claude Code reads `.claude-plugin/marketplace.json` and loads
+`plugins/holo-polymarket/.claude-plugin/plugin.json`, registering both skills.
+For local development: `/plugin marketplace add /absolute/path/to/holo-polymarket`.
 
-## 缓存
+### Codex
 
-```bash
-# 单次禁用缓存
-NO_CACHE=1 bash scripts/polymarket.sh history fed-decision-in-march-885 2025-01-01 2025-01-31
+Codex discovers the same plugin via `.agents/plugins/marketplace.json`. Running
+Codex inside this directory lists `holo-polymarket` under available plugins; no
+extra configuration is needed.
 
-# 缓存统计
-bash -c 'source scripts/cache.sh && cache_stats'
-
-# 清空缓存
-bash -c 'source scripts/cache.sh && cache_clear'
-```
-
-可选环境变量：
-- `NO_CACHE=1`
-- `CACHE_TTL=<seconds>`
-- `CURL_TIMEOUT=<seconds>`
-- `CURL_RETRY=<count>`
-- `GAMMA_API_BASE` / `DATA_API_BASE` / `CLOB_API_BASE`
-
-## 测试
+### ClawHub (OpenClaw skill registry)
 
 ```bash
-# 默认运行离线测试（不依赖外网）
-bash tests/run_tests.sh
-
-# 追加在线集成测试
-RUN_LIVE_TESTS=1 bash tests/run_tests.sh
-
-# 单独运行
-bash tests/test_api_unit.sh
-bash tests/test_series_args.sh
-bash tests/test_api.sh          # 需要网络
-bash tests/test_data_api.sh     # 需要网络
-bash tests/test_e2e_hot_detail.sh # 需要网络
+npm i -g clawhub
+clawhub skill publish skills/polymarket-query
+clawhub skill publish skills/polymarket-trade
+# install: clawhub install <publisher>/polymarket-query
 ```
 
-## 静态检查
+### OpenClaw / Hermes / other agents
+
+The skills use the AgentSkills folder format, so any compatible agent can consume
+`skills/` directly:
+
+- **OpenClaw**: copy/symlink folders under `skills/` into an OpenClaw skills
+  directory, load `plugins/holo-polymarket/openclaw.plugin.json`, or
+  `openclaw skills install`.
+- **Hermes**: register this repo's `skills/` directory in `~/.hermes/config.yaml`,
+  or host the generated `.well-known/agent-skills/index.json`.
+
+See [registry/openclaw.md](registry/openclaw.md) and
+[registry/hermes.md](registry/hermes.md).
+
+## Usage
+
+### Research (polymarket-query)
 
 ```bash
-bash scripts/lint.sh
+bash skills/polymarket-query/scripts/polymarket.sh hot 5
+bash skills/polymarket-query/scripts/polymarket.sh search bitcoin 5
+bash skills/polymarket-query/scripts/polymarket.sh detail fed-decision-in-march-885
+bash skills/polymarket-query/scripts/polymarket.sh lb 10 pnl week
+bash skills/polymarket-query/scripts/polymarket.sh pos 0xADDRESS 10 --active
+bash skills/polymarket-query/scripts/polymarket.sh history fed-decision-in-march-885 2025-01-01 2025-01-31 1d --format csv
 ```
 
-## 作为 OpenClaw Skill 部署
+Prerequisites: `bash`, `curl`, `jq`. Time args: `from/to` = `YYYY-MM-DD`,
+`interval` = `1h`/`4h`/`1d`. See
+[skills/polymarket-query/references/commands.md](skills/polymarket-query/references/commands.md).
+
+### Trading (polymarket-trade)
 
 ```bash
-bash openclaw_deploy_skill.sh ~/.openclaw/skills/polymarket
+pip install -r skills/polymarket-trade/scripts/requirements.txt
+
+# Inspect, then preview (dry-run prints a confirmation token)
+python3 skills/polymarket-trade/scripts/trade.py market <market-slug>
+python3 skills/polymarket-trade/scripts/trade.py buy <market-slug> yes --limit 0.40 --shares 10
+
+# Execute with the token from the dry-run
+python3 skills/polymarket-trade/scripts/trade.py buy <market-slug> yes --limit 0.40 --shares 10 \
+  --execute --confirm <token>
 ```
 
-部署内容包括：`SKILL.md`、`scripts/`、`references/`。
+**Every order is dry-run by default.** Executing requires both `--execute` and a
+matching `--confirm <token>`. Market **BUY** `--amount` is USDC to spend; market
+**SELL** `--amount` is shares to sell. See
+[skills/polymarket-trade/SKILL.md](skills/polymarket-trade/SKILL.md) and
+[skills/polymarket-trade/references/trading.md](skills/polymarket-trade/references/trading.md).
 
-## 架构
+> Polymarket migrated to **CLOB V2** (pUSD collateral) on 2026-04-28; the legacy
+> `py-clob-client` is non-functional. This skill targets `py-clob-client-v2`.
+> The live trading surface is still stabilising upstream — preview with dry-runs,
+> start small, and verify against your account.
 
-- `scripts/common.sh`：公共工具（依赖检查、URL 编码、日期转换、统一错误输出）
-- `scripts/api.sh`：API 调用与历史序列获取
-- `scripts/format.sh`：终端输出格式化
-- `scripts/export.sh`：CSV/JSON 导出
-- `scripts/cache.sh`：本地缓存
-- `scripts/commands_market.sh`：`hot/search/detail`
-- `scripts/commands_whale.sh`：`leaderboard/positions/trades`
-- `scripts/commands_series.sh`：`history/trend/volume-trend`
-- `scripts/polymarket.sh`：CLI 入口与路由
+## Credentials
 
-## 交易功能
+Trading needs Polymarket CLOB credentials in a gitignored `KEY=VALUE` file. They
+are resolved agent-neutrally: `POLYMARKET_*` env vars, then
+`$POLYMARKET_CREDENTIALS_FILE`, then `./.credentials`,
+`~/.config/holo-polymarket/credentials`, and finally
+`~/.openclaw/credentials/polymarket_credentials`. See
+[skills/polymarket-trade/references/credentials.md](skills/polymarket-trade/references/credentials.md).
+The historical-price query also accepts an optional `BEARER_TOKEN` from the same
+file. Secrets are never printed; `trade.py whoami` reports only which fields are
+present.
 
-下单/撤单/余额管理请使用官方 [Polymarket CLI](https://github.com/Polymarket/polymarket-cli)。
+## Development
+
+```bash
+uv sync
+uv run ruff check .
+uv run ruff format --check .
+uv run holo-polymarket-validate          # repository invariants
+uv run holo-polymarket-sync-plugin --check
+uv run python -m pytest                  # Python tests
+bash tests/run_tests.sh                  # Bash skill tests (offline)
+RUN_LIVE_TESTS=1 bash tests/run_tests.sh # + live API integration tests
+```
+
+Regenerate the committed plugin skills copy after editing canonical skills:
+
+```bash
+uv run holo-polymarket-sync-plugin
+```
+
+Build release artifacts (skill/plugin archives + well-known discovery indexes +
+checksums) under `dist/`:
+
+```bash
+uv run holo-polymarket-build
+```
 
 ## License
 

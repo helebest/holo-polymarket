@@ -1,0 +1,31 @@
+[project]
+name = "holo-polymarket"
+version = "0.1.0"
+description = "Polymarket prediction-market query and trading Agent Skills with multi-runtime distribution tooling"
+requires-python = ">=3.10"
+dependencies = [
+    "pytest>=8.0.0",
+    "ruff>=0.5.0",
+]
+
+[project.scripts]
+holo-polymarket-validate = "holo_polymarket.validate:main"
+holo-polymarket-sync-plugin = "holo_polymarket.sync_plugin:main"
+holo-polymarket-build = "holo_polymarket.build:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/holo_polymarket"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+extend-exclude = ["plugins"]
