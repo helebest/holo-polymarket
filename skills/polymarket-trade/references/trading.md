@@ -1,5 +1,15 @@
 # How Polymarket CLOB trading works
 
+## Contents
+
+1. Markets, outcomes, and token ids
+2. Prices and sizes
+3. Order types
+4. CLOB V2 migration (read this before going live)
+5. Wallet / funder model
+6. Neg-risk markets
+7. Safety checklist for automated trading
+
 ## Markets, outcomes, and token ids
 
 - Each binary market has exactly two ERC-1155 outcome tokens (e.g. `Yes` / `No`)
@@ -28,6 +38,10 @@
 - `GTD` — Good-Til-Date limit order.
 - `FOK` — Fill-Or-Kill (all-or-nothing, immediate). Default for market orders.
 - `FAK` — Fill-And-Kill (fill what's available, cancel the rest).
+
+Override the default with `--order-type GTC|GTD|FOK|FAK` on `buy` / `sell`
+(default `GTC` for limit, `FOK` for market). The chosen type is bound into the
+confirm token, so changing it requires a fresh dry-run.
 
 A market order's `price`, if set, is a **worst-price / slippage bound**, not the
 execution price.

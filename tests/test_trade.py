@@ -381,3 +381,37 @@ def test_execute_failure_is_clean_error_not_traceback(tmp_path, monkeypatch, cap
     assert rc == 1
     assert out["mode"] == "error"
     assert "Invalid api key" in out["error"]
+
+
+def test_live_order_refused_when_funder_is_bare_eoa_with_proxy_sig_type(tmp_path: Path) -> None:
+    """A proxy wallet type whose funder defaulted to the signer EOA must warn and refuse.
+
+    signature_type=1 (email/Magic) keeps funds in a proxy, but here only the EOA
+    address is configured, so funder resolves to the bare signer. Executing would
+    target an empty wallet, so the dry-run warns and --execute is blocked.
+    """
+    cred = tmp_path / ".credentials"
+    cred.write_text("POLYMARKET_ADDRESS=0xSignerEOA\nSIGNATURE_TYPE=1\n", encoding="utf-8")
+    args = ["buy", "--token-id", "1", "--amount", "25", "--credentials-file", str(cred)]
+    dry = json.loads(run(*args).stdout)
+    assert dry["mode"] == "dry-run"
+    assert any("proxy wallet" in w for w in dry["warnings"])
+
+    # Even with the correct confirm token, execution is refused — nothing is sent.
+    res = run(*args, "--execute", "--confirm", dry["confirm_token"])
+    assert res.returncode == 2
+    assert json.loads(res.stdout)["mode"] == "blocked"
+
+
+def test_no_funder_footgun_when_proxy_differs_from_signer(tmp_path: Path) -> None:
+    """A correctly-configured proxy funder (distinct from the signer EOA) raises no warning."""
+    cred = tmp_path / ".credentials"
+    cred.write_text(
+        "POLYMARKET_ADDRESS=0xSignerEOA\nFUNDER=0xProxyWallet\nSIGNATURE_TYPE=1\n",
+        encoding="utf-8",
+    )
+    dry = json.loads(
+        run("buy", "--token-id", "1", "--amount", "25", "--credentials-file", str(cred)).stdout
+    )
+    assert dry["mode"] == "dry-run"
+    assert not any("proxy wallet" in w for w in dry["warnings"])

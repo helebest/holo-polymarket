@@ -2,6 +2,33 @@
 
 All notable changes to this project are documented here.
 
+## 0.2.0
+
+### Added
+
+- `polymarket-trade`: pre-flight wallet guard — a live order is refused (and the
+  dry-run warns) when `signature_type` is a proxy type (`1`/`2`/`3`) but `funder`
+  resolves to the bare signer EOA, so an order can't silently target an empty
+  wallet. Set `POLYMARKET_FUNDER` to your proxy to proceed.
+- Documented the `--order-type GTC|GTD|FOK|FAK` flag (it is bound into the
+  confirm token) in the trade `SKILL.md` and `trading.md`.
+- `polymarket-query`: documented the leaderboard `-t|--time <period>` form and
+  the short forms it accepts (`d|w|m|a`, `volume`), plus a "Reading the output"
+  section that explains success vs valid-empty vs error states.
+- Tables of contents in the trade `credentials.md` / `trading.md` references, for
+  parity with the query references.
+
+### Fixed
+
+- The `trade.py` module docstring no longer claims `positions` / `market` run
+  with no third-party packages — both use `requests`; only `whoami` and offline
+  `--token-id` dry-run previews are genuinely dependency-free.
+
+### Changed
+
+- CI and release workflows now run on the Node 24 runtime (Actions bumped:
+  `checkout` v7, `setup-uv` v7, `upload-artifact` v7).
+
 ## 0.1.1
 
 ### Fixed

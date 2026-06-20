@@ -9,9 +9,10 @@ prints a deterministic confirmation token — but sends nothing. To actually pla
 an order you must pass BOTH ``--execute`` and ``--confirm <token>`` where the
 token matches the one printed by the dry-run for those exact parameters.
 
-Read-only commands (``market``, ``whoami``, ``positions``) and dry-run previews
-work without any third-party packages. Live placement / cancellation / balance
-reads require ``py-clob-client-v2`` (see references/trading.md).
+``whoami`` and fully offline ``--token-id`` dry-run previews need no third-party
+packages. ``market`` and ``positions`` use ``requests`` (the Gamma / Data API);
+live placement / cancellation / balance reads also need ``py-clob-client-v2``
+(see references/trading.md).
 """
 
 from __future__ import annotations
@@ -84,6 +85,24 @@ def _resolve_target(args) -> tuple[str, str | None, md.Market | None, float]:
     market = md.fetch_market(args.market)
     token_id, label, price = market.token_for(args.outcome)
     return token_id, label, market, price
+
+
+def _funder_footgun(creds) -> str | None:
+    """Flag the proxy-vs-EOA misconfiguration that silently targets an empty wallet.
+
+    A non-EOA wallet type (``signature_type`` 1/2/3) keeps funds in a proxy whose
+    address differs from the signer EOA. If ``funder`` was never set, it defaults
+    to the signer address — so the order would target the empty EOA instead of the
+    funded proxy. Worth warning about in a preview and refusing on execute.
+    """
+    funder, address = creds.effective_funder, creds.address
+    if creds.signature_type != 0 and funder and address and funder.lower() == address.lower():
+        return (
+            f"signature_type={creds.signature_type} (non-EOA wallet) but funder equals the "
+            f"signer EOA {address} — set POLYMARKET_FUNDER to your proxy wallet, or the order "
+            "targets the empty signer address"
+        )
+    return None
 
 
 def _cmd_order(args, side: str) -> int:
@@ -177,6 +196,7 @@ def _cmd_order(args, side: str) -> int:
     # confirm it targets the funded proxy (the funder) rather than the bare
     # signer EOA before executing. Loading is best-effort: a missing or
     # malformed credentials file must never block a dry-run preview.
+    footgun: str | None = None
     try:
         _order_creds = creds_mod.load_credentials(args.credentials_file)
     except creds_mod.CredentialError:
@@ -185,6 +205,9 @@ def _cmd_order(args, side: str) -> int:
         if _order_creds.effective_funder:
             payload["funder"] = _order_creds.effective_funder
         payload["signature_type"] = _order_creds.signature_type
+        footgun = _funder_footgun(_order_creds)
+        if footgun:
+            warnings.append(footgun)
 
     if not args.execute:
         payload["mode"] = "dry-run"
@@ -198,6 +221,15 @@ def _cmd_order(args, side: str) -> int:
             "missing or mismatched --confirm token; expected "
             f"{confirm} (dry-run first to obtain it)"
         )
+        _print_json(payload)
+        return 2
+
+    if footgun:
+        # The confirm token matched, but executing would target the empty signer
+        # EOA because the proxy funder is unset. Refuse rather than place a
+        # mis-targeted order; fix by setting POLYMARKET_FUNDER to the proxy.
+        payload["mode"] = "blocked"
+        payload["error"] = footgun
         _print_json(payload)
         return 2
 

@@ -2,7 +2,7 @@
 name: polymarket-trade
 description: Trade on Polymarket prediction markets through the official CLOB API — buy and sell outcome shares (market or limit orders), preview costs, check collateral balance, list open orders, and cancel orders. Every order is dry-run by default and requires an explicit confirmation token to execute. Use when the user wants to place, preview, or cancel real Polymarket trades. For read-only market research, probabilities, positions, and history, use the polymarket-query skill instead.
 metadata:
-  version: "0.1.1"
+  version: "0.2.0"
 ---
 
 # Polymarket Trade
@@ -79,6 +79,10 @@ You can target a CLOB token id directly with `--token-id <id>` instead of
 - **Market SELL** `--amount` is **shares to sell**; USDC received ≈ amount × price.
 - **Limit** orders use `--limit <price 0..1>` and `--shares <n>`; price must be a
   multiple of the market's tick size.
+- **Order type**: `--order-type GTC|GTD|FOK|FAK` overrides the default (`GTC` for
+  limit, `FOK` for market). It is bound into the confirm token, so changing it
+  re-previews. See [references/trading.md](references/trading.md) for what each
+  type means.
 
 ## Safety model
 
@@ -94,6 +98,10 @@ You can target a CLOB token id directly with `--token-id <id>` instead of
    market tick size; sizes below the market minimum produce a warning.
 4. Resolve the outcome explicitly (`yes`/`no`/label/index) — do not assume
    index 0 is "Yes" for every market.
+5. Before a live order, the funded wallet is sanity-checked: if `signature_type`
+   is a proxy type (`1`/`2`/`3`) but `funder` resolves to the bare signer EOA,
+   execution is refused (set `POLYMARKET_FUNDER` to your proxy) so an order can't
+   silently target an empty wallet. The dry-run surfaces this as a warning.
 
 See [references/trading.md](references/trading.md) for how Polymarket CLOB
 trading works (CLOB V2, pUSD collateral, wallet/funder model, neg-risk markets,

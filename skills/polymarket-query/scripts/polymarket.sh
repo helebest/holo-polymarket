@@ -29,6 +29,8 @@ print_usage() {
     echo "Whale tracking:"
     echo "  leaderboard [limit] [pnl|vol] [day|week|month|all]"
     echo "                              Leaderboard (alias lb)"
+    echo "  leaderboard -t|--time <period> [limit] [pnl|vol]"
+    echo "                              ...or set the window first"
     echo "  positions <address> [limit] View positions (alias pos)"
     echo "  trades <address> [limit]    View trade history"
     echo ""
