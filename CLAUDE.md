@@ -100,7 +100,11 @@ dispatches by domain:
 - Trading is dry-run by default; never execute without `--execute --confirm`.
 - After editing canonical skills, run `holo-polymarket-sync-plugin` and commit the
   regenerated `plugins/holo-polymarket/skills/` copy.
-- Keep manifest versions, both marketplaces, and `pyproject.toml` in lockstep.
+- Keep versions in lockstep across `pyproject.toml`, both marketplaces, the
+  Claude/Codex/OpenClaw plugin manifests, and `polymarket-trade/SKILL.md`
+  (enforced by `holo-polymarket-validate`). Each iteration bumps them together
+  with a `CHANGELOG.md` entry; publish by pushing a `vX.Y.Z` tag, which triggers
+  `.github/workflows/release.yml` to build and publish the GitHub Release.
 
 ## Environment variables
 

@@ -173,6 +173,31 @@ checksums) under `dist/`:
 uv run holo-polymarket-build
 ```
 
+## Releasing
+
+Versions are tracked in lockstep across every manifest and enforced by
+`holo-polymarket-validate` (CI fails otherwise):
+
+- `pyproject.toml`
+- `.claude-plugin/marketplace.json` (metadata + plugin entry)
+- the **Claude** plugin (`plugins/holo-polymarket/.claude-plugin/plugin.json`)
+- the **Codex** plugin (`plugins/holo-polymarket/.codex-plugin/plugin.json`)
+- the OpenClaw manifest (`plugins/holo-polymarket/openclaw.plugin.json`)
+- `skills/polymarket-trade/SKILL.md`
+
+To cut a release for an iteration:
+
+1. Bump the version in all of the above (keep them identical) and add a
+   `## X.Y.Z` section to `CHANGELOG.md`. `uv run holo-polymarket-validate`
+   confirms the lockstep.
+2. Merge to `main`.
+3. Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+
+The `Release` workflow (`.github/workflows/release.yml`) triggers on `v*.*.*`
+tags: it verifies the tag matches `pyproject.toml`, runs the build, and publishes
+a GitHub Release named `vX.Y.Z` with the skill/plugin zips and `checksums.txt`
+attached and notes pulled from `CHANGELOG.md`.
+
 ## License
 
 MIT
