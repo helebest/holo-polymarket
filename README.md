@@ -114,15 +114,38 @@ matching `--confirm <token>`. Market **BUY** `--amount` is USDC to spend; market
 
 ## Credentials
 
-Trading needs Polymarket CLOB credentials in a gitignored `KEY=VALUE` file. They
-are resolved agent-neutrally: `POLYMARKET_*` env vars, then
+Credentials live in a gitignored `KEY=VALUE` file (or `POLYMARKET_*` env vars),
+resolved agent-neutrally: `POLYMARKET_*` env vars, then
 `$POLYMARKET_CREDENTIALS_FILE`, then `./.credentials`,
 `~/.config/holo-polymarket/credentials`, and finally
-`~/.openclaw/credentials/polymarket_credentials`. See
-[skills/polymarket-trade/references/credentials.md](skills/polymarket-trade/references/credentials.md).
-The historical-price query also accepts an optional `BEARER_TOKEN` from the same
-file. Secrets are never printed; `trade.py whoami` reports only which fields are
-present.
+`~/.openclaw/credentials/polymarket_credentials`. Secrets are never printed;
+`trade.py whoami` reports only which fields are present. Copy
+[`.credentials.example`](.credentials.example) to `./.credentials` to start.
+
+> **Use your proxy wallet, not the signer.** Polymarket email/Magic (and browser)
+> logins keep your USDC and positions in a deterministic **proxy wallet** whose
+> address differs from the signer/EOA. The Data API and CLOB only ever see that
+> proxy, so pointing a skill at the signer address shows an empty account. Set
+> `POLYMARKET_FUNDER` to the proxy and `POLYMARKET_SIGNATURE_TYPE=1` (email/Magic).
+> Copy the proxy address from the logged-in Polymarket profile URL
+> (`polymarket.com/@0x…`) or the top-right account menu.
+
+Which keys each core workflow uses (recommended name; short aliases like
+`API_KEY` / `SECRET` / `FUNDER` are also accepted, matching Polymarket's export):
+
+| Key (aliases) | Purpose | Positions / balance | Trading |
+| --- | --- | --- | --- |
+| `POLYMARKET_FUNDER` (`FUNDER`) | Proxy wallet holding funds/positions | **Required** | **Required** |
+| `POLYMARKET_SIGNATURE_TYPE` (`SIGNATURE_TYPE`) | `0` EOA · `1` email/Magic · `2` browser · `3` deposit | — | **Required** (email/Magic = `1`) |
+| `POLYMARKET_PRIVATE_KEY` (`PRIVATE_KEY`, `PK`) | Signs orders (EIP-712) | — | **Required** |
+| `POLYMARKET_API_KEY` / `_API_SECRET` / `_API_PASSPHRASE` (`API_KEY`, `SECRET`, `PASSPHRASE`) | CLOB L2 auth | Needed for `balance`/`orders` | **Required** |
+| `POLYMARKET_ADDRESS` (`PRIVATE_ADDRESS`) | Signer EOA | `FUNDER` fallback / info only | `FUNDER` fallback only |
+| `POLYMARKET_BEARER_TOKEN` (`BEARER_TOKEN`) | Query historical-price auth (optional) | Not used | Not used |
+| `RECOVERYCODE` | Magic recovery phrase | **Ignored** | **Ignored** |
+
+With `POLYMARKET_FUNDER` set, the query skill's `positions` / `trades` and
+`trade.py positions` default to your own wallet when no address is given. Full
+details: [skills/polymarket-trade/references/credentials.md](skills/polymarket-trade/references/credentials.md).
 
 ## Development
 
@@ -149,6 +172,31 @@ checksums) under `dist/`:
 ```bash
 uv run holo-polymarket-build
 ```
+
+## Releasing
+
+Versions are tracked in lockstep across every manifest and enforced by
+`holo-polymarket-validate` (CI fails otherwise):
+
+- `pyproject.toml`
+- `.claude-plugin/marketplace.json` (metadata + plugin entry)
+- the **Claude** plugin (`plugins/holo-polymarket/.claude-plugin/plugin.json`)
+- the **Codex** plugin (`plugins/holo-polymarket/.codex-plugin/plugin.json`)
+- the OpenClaw manifest (`plugins/holo-polymarket/openclaw.plugin.json`)
+- `skills/polymarket-trade/SKILL.md`
+
+To cut a release for an iteration:
+
+1. Bump the version in all of the above (keep them identical) and add a
+   `## X.Y.Z` section to `CHANGELOG.md`. `uv run holo-polymarket-validate`
+   confirms the lockstep.
+2. Merge to `main`.
+3. Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+
+The `Release` workflow (`.github/workflows/release.yml`) triggers on `v*.*.*`
+tags: it verifies the tag matches `pyproject.toml`, runs the build, and publishes
+a GitHub Release named `vX.Y.Z` with the skill/plugin zips and `checksums.txt`
+attached and notes pulled from `CHANGELOG.md`.
 
 ## License
 

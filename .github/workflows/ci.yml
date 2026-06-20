@@ -9,22 +9,22 @@ on:
 permissions:
   contents: read
 
-jobs:
-  test:
-    name: Test
-    runs-on: ubuntu-latest
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
+jobs:
+  lint:
+    name: Lint & validate
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
-
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.10"
+          python-version: "3.12"
           enable-cache: true
 
       - name: Install dependencies
@@ -42,6 +42,41 @@ jobs:
       - name: Validate plugin sync
         run: uv run holo-polymarket-sync-plugin --check
 
+  test:
+    name: Test (${{ matrix.os }}, py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Python >=3.10 is supported (pyproject); the macOS entry exercises the
+        # Bash skills on BSD userland (date, sed) and bash 3.2.
+        include:
+          - { os: ubuntu-latest, python: "3.10" }
+          - { os: ubuntu-latest, python: "3.11" }
+          - { os: ubuntu-latest, python: "3.12" }
+          - { os: ubuntu-latest, python: "3.13" }
+          - { os: macos-latest, python: "3.12" }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install jq (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Install jq (macOS)
+        if: runner.os == 'macOS'
+        run: which jq || brew install jq
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
       - name: Prepare test temp directory
         run: mkdir -p .tmp
 
@@ -50,3 +85,30 @@ jobs:
 
       - name: Run Bash skill tests (offline)
         run: bash tests/run_tests.sh
+
+  build:
+    name: Build artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Build release artifacts (skill/plugin zips, well-known indexes, checksums)
+        run: uv run holo-polymarket-build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: holo-polymarket-dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14

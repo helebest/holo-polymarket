@@ -83,6 +83,35 @@ assert_status "fetch_volume_history invalid payload exits non-zero" 1 "$CODE"
 assert_eq "fetch_volume_history invalid payload returns []" "[]" "$RESULT"
 assert_eq "fetch_volume_history invalid payload does not cache" "0" "$CACHE_SET_CALLED"
 
+echo "[Test 7] load_polymarket_funder resolves env then credentials file"
+unset POLYMARKET_FUNDER
+# env wins
+POLYMARKET_FUNDER="0xEnvFunder"
+OUT=$(load_polymarket_funder)
+CODE=$?
+assert_status "funder env resolves" 0 "$CODE"
+assert_eq "funder env value" "0xEnvFunder" "$OUT"
+unset POLYMARKET_FUNDER
+# credentials file: FUNDER key, tolerant of spaces around '='
+TMP_CRED=$(mktemp)
+printf '# creds\nFUNDER = 0xFileFunder\nAPI_KEY=ignored\n' >"$TMP_CRED"
+POLYMARKET_CREDENTIALS_FILE="$TMP_CRED"
+OUT=$(load_polymarket_funder)
+CODE=$?
+assert_status "funder file resolves" 0 "$CODE"
+assert_eq "funder file value" "0xFileFunder" "$OUT"
+# POLYMARKET_FUNDER key variant in the file is also accepted
+printf 'POLYMARKET_FUNDER=0xFilePrefixed\n' >"$TMP_CRED"
+OUT=$(load_polymarket_funder)
+assert_eq "funder file POLYMARKET_FUNDER key" "0xFilePrefixed" "$OUT"
+rm -f "$TMP_CRED"
+# missing env + missing file -> non-zero
+POLYMARKET_CREDENTIALS_FILE="/tmp/non-existent-polymarket-funder-xyz"
+OUT=$(load_polymarket_funder)
+CODE=$?
+assert_status "funder missing returns non-zero" 1 "$CODE"
+unset POLYMARKET_CREDENTIALS_FILE
+
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="
 [ "$FAIL" -eq 0 ]
