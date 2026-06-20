@@ -2,7 +2,7 @@
 name: polymarket-trade
 description: Trade on Polymarket prediction markets through the official CLOB API — buy and sell outcome shares (market or limit orders), preview costs, check collateral balance, list open orders, and cancel orders. Every order is dry-run by default and requires an explicit confirmation token to execute. Use when the user wants to place, preview, or cancel real Polymarket trades. For read-only market research, probabilities, positions, and history, use the polymarket-query skill instead.
 metadata:
-  version: "0.1.0"
+  version: "0.1.1"
 ---
 
 # Polymarket Trade
@@ -28,6 +28,13 @@ Provide credentials in a gitignored `KEY=VALUE` file (see
 agent-neutrally: `POLYMARKET_*` env vars, then `$POLYMARKET_CREDENTIALS_FILE`,
 then `./.credentials`, `~/.config/holo-polymarket/credentials`, and finally
 `~/.openclaw/credentials/polymarket_credentials`.
+
+Set `POLYMARKET_FUNDER` to your **proxy wallet** (the address holding funds and
+positions — for email/Magic logins it differs from the signer) and
+`POLYMARKET_SIGNATURE_TYPE` to match your wallet (`1` email/Magic, `2` browser).
+Otherwise `balance` / `positions` resolve to the empty signer EOA. See
+[references/credentials.md](references/credentials.md) and
+[references/trading.md](references/trading.md).
 
 Verify what was loaded (no secrets are printed):
 

@@ -181,3 +181,203 @@ def test_credentials_env_overrides_file(tmp_path, monkeypatch) -> None:
     loaded = creds_mod.load_credentials(str(cred))
     assert loaded.address == "0xFromEnv"
     assert loaded.effective_funder == "0xFromEnv"
+
+
+def test_dry_run_preview_surfaces_funder_and_signature_type(tmp_path: Path) -> None:
+    """Operators must see which wallet an order would use before executing."""
+    cred = tmp_path / ".credentials"
+    cred.write_text("FUNDER=0xProxyWallet\nSIGNATURE_TYPE=1\n", encoding="utf-8")
+    payload = json.loads(
+        run(
+            "buy",
+            "--token-id",
+            "1",
+            "--limit",
+            "0.40",
+            "--shares",
+            "10",
+            "--credentials-file",
+            str(cred),
+        ).stdout
+    )
+    assert payload["mode"] == "dry-run"
+    assert payload["funder"] == "0xProxyWallet"
+    assert payload["signature_type"] == 1
+
+
+def test_dry_run_preview_works_without_any_credentials(tmp_path: Path) -> None:
+    """A missing credentials file must never block a dry-run preview."""
+    missing = tmp_path / "absent"
+    payload = json.loads(
+        run(
+            "buy",
+            "--token-id",
+            "1",
+            "--limit",
+            "0.40",
+            "--shares",
+            "10",
+            "--credentials-file",
+            str(missing),
+        ).stdout
+    )
+    assert payload["mode"] == "dry-run"
+    assert "funder" not in payload  # nothing configured -> nothing surfaced
+
+
+def test_positions_defaults_to_funder_not_signer(monkeypatch) -> None:
+    """`positions` with no address must query the funder (proxy), not the EOA."""
+    import types
+
+    import trade as trade_mod
+
+    captured: dict[str, str] = {}
+
+    class _Resp:
+        def raise_for_status(self) -> None:
+            pass
+
+        def json(self) -> list:
+            return []
+
+    def _get(url, params=None, timeout=None):
+        captured.update(params or {})
+        return _Resp()
+
+    monkeypatch.setitem(
+        sys.modules, "requests", types.SimpleNamespace(get=_get, RequestException=Exception)
+    )
+    # Funder (proxy) and a different signer EOA both present: the funder wins.
+    monkeypatch.setenv("POLYMARKET_FUNDER", "0xProxyWallet")
+    monkeypatch.setenv("POLYMARKET_ADDRESS", "0xSignerEOA")
+
+    args = types.SimpleNamespace(address=None, credentials_file=None, limit=5)
+    assert trade_mod._cmd_positions(args) == 0
+    assert captured["user"] == "0xProxyWallet"
+
+
+def _bare_adapter():
+    """A ClobAdapter instance without running __init__ (no client package)."""
+    import clob
+
+    return clob.ClobAdapter.__new__(clob.ClobAdapter)
+
+
+def test_list_orders_uses_get_open_orders() -> None:
+    adapter = _bare_adapter()
+    seen = {}
+
+    class _Client:
+        def get_open_orders(self, params=None):
+            seen["called"] = "get_open_orders"
+            return []
+
+    class _Types:
+        class OpenOrderParams:
+            pass
+
+    class _Creds:
+        def require_api_creds(self):
+            pass
+
+    adapter._client, adapter._types, adapter._creds = _Client(), _Types, _Creds()
+    assert adapter.list_orders() == []
+    assert seen["called"] == "get_open_orders"
+
+
+def test_cancel_uses_cancel_order_with_payload() -> None:
+    adapter = _bare_adapter()
+    seen = {}
+
+    class _Payload:
+        def __init__(self, orderID=None):
+            self.orderID = orderID
+
+    class _Client:
+        def cancel_order(self, payload):
+            seen["id"] = payload.orderID
+            return {"canceled": payload.orderID}
+
+    class _Types:
+        OrderPayload = _Payload
+
+    class _Creds:
+        def require_signer(self):
+            pass
+
+    adapter._client, adapter._types, adapter._creds = _Client(), _Types, _Creds()
+    assert adapter.cancel("0xABC")["canceled"] == "0xABC"
+    assert seen["id"] == "0xABC"
+
+
+def test_cancel_all_cancels_each_open_order_id() -> None:
+    adapter = _bare_adapter()
+    seen = {}
+
+    class _Client:
+        def get_open_orders(self, params=None):
+            return [{"id": "a"}, {"id": "b"}]
+
+        def cancel_orders(self, order_hashes):
+            seen["hashes"] = order_hashes
+            return {"canceled": order_hashes}
+
+    class _Types:
+        class OpenOrderParams:
+            pass
+
+    class _Creds:
+        def require_signer(self):
+            pass
+
+        def require_api_creds(self):
+            pass
+
+    adapter._client, adapter._types, adapter._creds = _Client(), _Types, _Creds()
+    assert adapter.cancel_all()["canceled"] == ["a", "b"]
+    assert seen["hashes"] == ["a", "b"]
+
+
+def test_execute_failure_is_clean_error_not_traceback(tmp_path, monkeypatch, capsys) -> None:
+    """An exchange/client error during --execute must yield mode:error, not a traceback."""
+    import types
+
+    import trade as trade_mod
+
+    cred = tmp_path / ".credentials"
+    cred.write_text(
+        "POLYMARKET_PRIVATE_KEY=0xPRIVKEY123\nPOLYMARKET_API_KEY=APIKEY123\n"
+        "POLYMARKET_API_SECRET=APISECRET123\nPOLYMARKET_API_PASSPHRASE=PASSPHRASE123\n",
+        encoding="utf-8",
+    )
+    base = dict(
+        token_id="1",
+        market=None,
+        outcome=None,
+        amount=25.0,
+        shares=None,
+        limit=None,
+        order_type=None,
+        tick_size=None,
+        neg_risk=False,
+        credentials_file=str(cred),
+    )
+    # Obtain the matching confirm token from a dry-run.
+    trade_mod._cmd_order(types.SimpleNamespace(execute=False, confirm=None, **base), "BUY")
+    token = json.loads(capsys.readouterr().out)["confirm_token"]
+
+    class _Adapter:
+        def __init__(self, creds):
+            pass
+
+        def place_market_order(self, *a, **k):
+            raise RuntimeError("Unauthorized/Invalid api key")
+
+    monkeypatch.setitem(
+        sys.modules, "clob", types.SimpleNamespace(ClobAdapter=_Adapter, ClobError=Exception)
+    )
+    rc = trade_mod._cmd_order(types.SimpleNamespace(execute=True, confirm=token, **base), "BUY")
+    out = json.loads(capsys.readouterr().out)
+    assert rc == 1
+    assert out["mode"] == "error"
+    assert "Invalid api key" in out["error"]

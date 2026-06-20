@@ -173,6 +173,19 @@ def _cmd_order(args, side: str) -> int:
     payload["confirm_token"] = confirm
     payload["warnings"] = warnings
 
+    # Surface the wallet the order would actually use, so the operator can
+    # confirm it targets the funded proxy (the funder) rather than the bare
+    # signer EOA before executing. Loading is best-effort: a missing or
+    # malformed credentials file must never block a dry-run preview.
+    try:
+        _order_creds = creds_mod.load_credentials(args.credentials_file)
+    except creds_mod.CredentialError:
+        _order_creds = None
+    if _order_creds is not None:
+        if _order_creds.effective_funder:
+            payload["funder"] = _order_creds.effective_funder
+        payload["signature_type"] = _order_creds.signature_type
+
     if not args.execute:
         payload["mode"] = "dry-run"
         payload["hint"] = f"to execute: re-run with --execute --confirm {confirm}"
@@ -189,6 +202,7 @@ def _cmd_order(args, side: str) -> int:
         return 2
 
     # Live execution.
+    creds = None
     try:
         import clob
 
@@ -217,9 +231,12 @@ def _cmd_order(args, side: str) -> int:
         payload["result"] = result if isinstance(result, dict) else str(result)
         _print_json(payload)
         return 0
-    except (clob.ClobError, creds_mod.CredentialError) as exc:
+    except Exception as exc:  # noqa: BLE001
+        # Any failure from the client library (e.g. an exchange rejection like
+        # PolyApiException) must surface as a clean, secret-scrubbed error rather
+        # than an uncaught traceback that could leak inputs.
         payload["mode"] = "error"
-        payload["error"] = _scrub(creds, str(exc))
+        payload["error"] = _scrub(creds, f"{type(exc).__name__}: {exc}")
         _print_json(payload)
         return 1
 
@@ -257,7 +274,10 @@ def _cmd_whoami(args) -> int:
 
 def _cmd_positions(args) -> int:
     creds = creds_mod.load_credentials(args.credentials_file)
-    address = args.address or creds.address
+    # Positions live in the funding wallet (the proxy for email/Magic logins),
+    # never the bare signer EOA. Default to the funder so a configured account
+    # resolves to the wallet that actually holds the positions.
+    address = args.address or creds.effective_funder
     if not address:
         raise SystemExit("error: no address given and none found in credentials")
     try:
@@ -403,7 +423,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_positions = sub.add_parser("positions", help="show positions for an address (Data API)")
     p_positions.add_argument(
-        "address", nargs="?", help="wallet address (default: credentials address)"
+        "address", nargs="?", help="wallet address (default: credentials funder)"
     )
     p_positions.add_argument("--limit", type=int, default=20)
     _add_credentials_arg(p_positions)

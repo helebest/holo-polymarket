@@ -161,6 +161,45 @@ load_polymarket_bearer_token() {
     echo "$token"
 }
 
+# Load the caller's own funding wallet (the proxy that holds positions for
+# email/Magic logins). Used as the default address for positions/trades when
+# none is given on the command line. Env var first, then a credentials file.
+# Accepts POLYMARKET_FUNDER or FUNDER field names (matching the trade skill).
+load_polymarket_funder() {
+    if [ -n "${POLYMARKET_FUNDER:-}" ]; then
+        echo "$POLYMARKET_FUNDER"
+        return 0
+    fi
+
+    local cred_file
+    cred_file=$(_pm_resolve_credentials_file) || return 1
+    if [ ! -f "$cred_file" ]; then
+        return 1
+    fi
+
+    local funder
+    funder=$(awk -F'=' '
+        /^[[:space:]]*#/ { next }
+        /^[[:space:]]*$/ { next }
+        {
+            k=$1
+            v=substr($0, index($0, "=") + 1)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", k)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+            if (k=="POLYMARKET_FUNDER" || k=="FUNDER") {
+                print v
+                exit
+            }
+        }
+    ' "$cred_file")
+
+    if [ -z "$funder" ]; then
+        return 1
+    fi
+
+    echo "$funder"
+}
+
 # Fetch hot events
 # Usage: fetch_hot_events [limit]
 fetch_hot_events() {

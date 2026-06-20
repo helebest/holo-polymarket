@@ -24,6 +24,21 @@
 - Install the missing dependencies and retry.
 - In CI/container environments, confirm the dependencies are pre-installed.
 
+## 2b. `positions` / `trades` show nothing for a real account
+
+### Symptom
+- You hold positions on polymarket.com, but `positions <address>` returns
+  "No positions" (and `value`/PnL look empty).
+
+### Resolution
+- You are almost certainly querying the **signer/EOA** address. Polymarket
+  email/Magic (and browser) logins keep funds and positions in a separate
+  **proxy wallet**. Query that proxy address instead.
+- Find the proxy: log in at polymarket.com and copy the address from the profile
+  URL (`polymarket.com/@0x…`) or the top-right account menu.
+- To default to it, set `POLYMARKET_FUNDER` (or `FUNDER` in the credentials file)
+  to the proxy address; then `positions` / `trades` work with no address argument.
+
 ## 3. Network and API errors
 
 ### Symptom

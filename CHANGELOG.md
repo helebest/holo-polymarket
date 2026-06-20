@@ -2,6 +2,38 @@
 
 All notable changes to this project are documented here.
 
+## 0.1.1
+
+### Fixed
+
+- `polymarket-trade positions` now defaults to the **funder** (the proxy wallet
+  that holds funds/positions) instead of the bare signer EOA, so a configured
+  account resolves to the wallet that actually has positions.
+- CLOB v2 method-name drift in the live adapter: `orders` now uses
+  `get_open_orders` (was `get_orders`), and `cancel` / `cancel --all` use the v2
+  `cancel_order(OrderPayload)` / `cancel_orders(list)` calls (v1 names kept as
+  fallbacks).
+- `--execute` now reports any client/exchange failure (e.g. `PolyApiException`)
+  as a clean, secret-scrubbed `mode: error` instead of leaking an uncaught
+  traceback.
+
+### Added
+
+- `polymarket-query` `positions` / `trades` default to `POLYMARKET_FUNDER`
+  (`FUNDER`) when no address is given, so you can look up your own holdings
+  without pasting your proxy address each time.
+- Order dry-run previews now surface the `funder` and `signature_type` the order
+  would use, so you can confirm it targets the proxy before executing.
+- A committed `.credentials.example` template.
+
+### Changed
+
+- Standardised credentials documentation on the `POLYMARKET_*` key names (short
+  aliases still accepted) and added a per-workflow breakdown of which keys
+  positions/balance and trading actually use, including the proxy-wallet vs EOA
+  distinction and that `RECOVERYCODE` is ignored. Updated README, the trade
+  `credentials.md`, query SKILL/commands/troubleshooting docs, and CLAUDE.md.
+
 ## 0.1.0
 
 Initial multi-runtime release.

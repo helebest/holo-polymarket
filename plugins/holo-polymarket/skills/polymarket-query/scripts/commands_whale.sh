@@ -63,9 +63,14 @@ handle_whale_command() {
             elif [ "$3" = "--active" ]; then
                 filter_active="yes"
             fi
-            
+
+            # Default to the caller's own funding wallet (the proxy that holds
+            # positions) when no address is given. See load_polymarket_funder.
+            [ -z "$addr" ] && addr=$(load_polymarket_funder 2>/dev/null)
+
             if [ -z "$addr" ]; then
                 echo "Usage: bash polymarket.sh positions <wallet-address> [limit] [--active]"
+                echo "       (or set POLYMARKET_FUNDER / FUNDER in credentials to default to your own wallet)"
                 return 1
             fi
 
@@ -82,8 +87,13 @@ handle_whale_command() {
         trades)
             local addr="$1"
             local limit="${2:-10}"
+
+            # Default to the caller's own funding wallet when no address is given.
+            [ -z "$addr" ] && addr=$(load_polymarket_funder 2>/dev/null)
+
             if [ -z "$addr" ]; then
                 echo "Usage: bash polymarket.sh trades <wallet-address> [limit]"
+                echo "       (or set POLYMARKET_FUNDER / FUNDER in credentials to default to your own wallet)"
                 return 1
             fi
 

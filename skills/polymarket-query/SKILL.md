@@ -34,6 +34,9 @@ Full command list: [references/commands.md](references/commands.md). Troubleshoo
 - Track top traders / check positions: `leaderboard` (alias `lb`) → `positions`
   (alias `pos`) → `trades`.
   - Only open positions: `positions <address> [limit] --active`.
+  - Your own wallet: with `POLYMARKET_FUNDER` (or `FUNDER`) set, `positions` /
+    `trades` default to it when no address is given. Use your **proxy wallet**
+    address (the one holding funds/positions), not the signer/EOA.
 - Time-series review:
   - Probability table: `history`
   - Start/end change summary: `trend`
@@ -87,6 +90,11 @@ order (agent-neutral, not tied to any runtime):
 
 The credentials file is `KEY=VALUE` and supports the `BEARER_TOKEN` / `TOKEN`
 fields.
+
+The same file (or env) may also provide `POLYMARKET_FUNDER` / `FUNDER` — your own
+**proxy wallet** address. When set, `positions` / `trades` default to it if no
+address is given on the command line. This is the only identity the query skill
+reads; everything else here is read-only and public.
 
 ## Trading boundary
 

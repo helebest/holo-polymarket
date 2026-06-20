@@ -224,17 +224,42 @@ class ClobAdapter:
 
     def cancel(self, order_id: str) -> dict:
         self._creds.require_signer()
-        return self._client.cancel(order_id)
+        # v2: cancel_order(OrderPayload(orderID=...)); v1: cancel(order_id).
+        method, name = _first_method(self._client, "cancel_order", "cancel")
+        if not method:
+            raise ClobError("client has no cancel-order method")
+        if name == "cancel_order":
+            payload_cls = getattr(self._types, "OrderPayload", None)
+            if payload_cls is not None:
+                return method(payload_cls(orderID=order_id))
+        return method(order_id)
 
     def cancel_all(self) -> dict:
         self._creds.require_signer()
-        return self._client.cancel_all()
+        # v1 had a dedicated cancel_all; v2 does not, so cancel every open
+        # order by id via cancel_orders(list_of_ids).
+        method, _ = _first_method(self._client, "cancel_all")
+        if method:
+            return method()
+        cancel_many, _ = _first_method(self._client, "cancel_orders")
+        if not cancel_many:
+            raise ClobError("client has no cancel-all support")
+        ids = [
+            (o.get("id") or o.get("orderID") or o.get("order_id"))
+            for o in self.list_orders()
+            if isinstance(o, dict)
+        ]
+        ids = [i for i in ids if i]
+        if not ids:
+            return {"canceled": [], "note": "no open orders"}
+        return cancel_many(ids)
 
     def list_orders(self) -> list:
         self._creds.require_api_creds()
-        method, _ = _first_method(self._client, "get_orders")
+        # v2 renamed get_orders -> get_open_orders (params optional).
+        method, _ = _first_method(self._client, "get_open_orders", "get_orders")
         if not method:
-            raise ClobError("client has no get_orders method")
+            raise ClobError("client has no open-orders method")
         params_cls = getattr(self._types, "OpenOrderParams", None)
         return method(params_cls()) if params_cls else method()
 

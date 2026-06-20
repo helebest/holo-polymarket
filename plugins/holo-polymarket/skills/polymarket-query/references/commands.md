@@ -82,7 +82,9 @@ Common environment variables:
 - `CACHE_TTL=<seconds>`
 - `CURL_TIMEOUT=<seconds>`
 - `GAMMA_API_BASE` / `DATA_API_BASE` / `CLOB_API_BASE`
-- `POLYMARKET_BEARER_TOKEN`
+- `POLYMARKET_BEARER_TOKEN` (optional auth for the historical-price endpoint)
+- `POLYMARKET_FUNDER` / `FUNDER` (default wallet for `positions` / `trades` when no
+  address is given — use your proxy wallet, not the signer/EOA)
 - `HTTP_PROXY` / `HTTPS_PROXY` / `http_proxy` / `https_proxy` (proxy)
 
 ## 5. Trading (polymarket-trade skill)
