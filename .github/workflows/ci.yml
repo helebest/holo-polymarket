@@ -1,5 +1,10 @@
 name: CI
 
+# Actions are pinned to the latest major tag that runs on Node 24 and still
+# publishes a floating major tag. setup-uv stays at @v7 on purpose: v8+ stopped
+# publishing the floating @v8 tag (immutable-release policy), so @v8 does not
+# resolve — bump it to a pinned full tag (e.g. @v8.x.y) rather than @v8.
+
 on:
   push:
     branches:
@@ -19,10 +24,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.12"
           enable-cache: true
@@ -58,7 +63,7 @@ jobs:
           - { os: macos-latest, python: "3.12" }
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install jq (Linux)
         if: runner.os == 'Linux'
@@ -69,7 +74,7 @@ jobs:
         run: which jq || brew install jq
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python }}
           enable-cache: true
@@ -91,10 +96,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.12"
           enable-cache: true
@@ -106,7 +111,7 @@ jobs:
         run: uv run holo-polymarket-build
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: holo-polymarket-dist
           path: dist/
