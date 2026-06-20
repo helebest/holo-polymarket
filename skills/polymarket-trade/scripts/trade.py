@@ -360,25 +360,57 @@ def _cmd_orders(args) -> int:
         raise SystemExit(f"error: {_scrub(creds, str(exc))}")
 
 
+def _order_ids(orders) -> list[str]:
+    """Sorted order ids from a list-orders response, tolerant of key spellings."""
+    ids = []
+    for order in orders or []:
+        if isinstance(order, dict):
+            oid = order.get("id") or order.get("orderID") or order.get("order_id")
+            if oid:
+                ids.append(str(oid))
+    return sorted(ids)
+
+
 def _cmd_cancel(args) -> int:
     creds = creds_mod.load_credentials(args.credentials_file)
     if not args.all and not args.order_id:
         raise SystemExit("error: provide an order id or --all")
-    target = "ALL open orders" if args.all else args.order_id
-    # Cancel is state-changing, so it follows the same two-factor model as orders:
-    # the confirm token is bound to the cancellation target.
-    confirm = _confirm_token(["cancel", "ALL" if args.all else args.order_id])
+
+    # Cancel is state-changing, so it follows the same two-factor model as orders.
+    # A single cancel binds the token to the order id (works offline). `--all`
+    # binds the token to a snapshot of the currently-open order ids, so a stale
+    # token from an earlier session cannot silently wipe orders the operator never
+    # saw in a preview: at execute time the snapshot is recomputed, and a changed
+    # set yields a different token that the old confirmation won't match. Listing
+    # needs the live client (which a real cancel needs anyway) and lets the preview
+    # show exactly what would be cancelled.
+    adapter = None
+    open_ids = None
+    if args.all:
+        try:
+            import clob
+
+            adapter = clob.ClobAdapter(creds)
+            open_ids = _order_ids(adapter.list_orders())
+        except Exception as exc:  # noqa: BLE001
+            raise SystemExit(f"error: {_scrub(creds, str(exc))}")
+        target = f"ALL open orders ({len(open_ids)})"
+        confirm = _confirm_token(["cancel", "ALL", *open_ids])
+    else:
+        target = args.order_id
+        confirm = _confirm_token(["cancel", args.order_id])
 
     if not args.execute:
-        _print_json(
-            {
-                "action": "cancel",
-                "target": target,
-                "confirm_token": confirm,
-                "mode": "dry-run",
-                "hint": f"to execute: re-run with --execute --confirm {confirm}",
-            }
-        )
+        payload = {
+            "action": "cancel",
+            "target": target,
+            "confirm_token": confirm,
+            "mode": "dry-run",
+            "hint": f"to execute: re-run with --execute --confirm {confirm}",
+        }
+        if open_ids is not None:
+            payload["open_order_ids"] = open_ids
+        _print_json(payload)
         return 0
 
     if args.confirm != confirm:
@@ -398,7 +430,8 @@ def _cmd_cancel(args) -> int:
     try:
         import clob
 
-        adapter = clob.ClobAdapter(creds)
+        if adapter is None:
+            adapter = clob.ClobAdapter(creds)
         result = adapter.cancel_all() if args.all else adapter.cancel(args.order_id)
         _print_json({"action": "cancel", "target": target, "mode": "executed", "result": result})
         return 0

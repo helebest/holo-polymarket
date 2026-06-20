@@ -1,6 +1,6 @@
 {
   "name": "holo-polymarket",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Query Polymarket prediction markets and trade via the official CLOB API.",
   "author": {
     "name": "holo",

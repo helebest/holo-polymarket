@@ -2,7 +2,7 @@
 name: polymarket-trade
 description: Trade on Polymarket prediction markets through the official CLOB API — buy and sell outcome shares (market or limit orders), preview costs, check collateral balance, list open orders, and cancel orders. Every order is dry-run by default and requires an explicit confirmation token to execute. Use when the user wants to place, preview, or cancel real Polymarket trades. For read-only market research, probabilities, positions, and history, use the polymarket-query skill instead.
 metadata:
-  version: "0.2.0"
+  version: "0.2.1"
 ---
 
 # Polymarket Trade
@@ -93,7 +93,10 @@ You can target a CLOB token id directly with `--token-id <id>` instead of
    bound to the **full** order — side, token id, price/amount, size, tick size,
    neg-risk flag, and order type — so changing any of them changes the token and
    a stale confirmation cannot execute a different order. `cancel` prints and
-   requires its own token, bound to the order id (or to `ALL` for `--all`).
+   requires its own token: a single cancel binds it to the order id, and `cancel
+   --all` binds it to a snapshot of the currently-open order ids (listed live and
+   shown in the preview), so a stale `--all` confirmation can't cancel orders
+   placed since you previewed. Previewing `--all` therefore needs API credentials.
 3. Order size must be positive, and limit prices are validated against the
    market tick size; sizes below the market minimum produce a warning.
 4. Resolve the outcome explicitly (`yes`/`no`/label/index) — do not assume

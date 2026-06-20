@@ -1,6 +1,6 @@
 {
   "name": "holo-polymarket",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Polymarket prediction-market query and official CLOB API trading skills.",
   "skills": ["./skills"]
 }

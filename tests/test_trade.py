@@ -121,10 +121,62 @@ def test_cancel_requires_a_matching_confirm_token() -> None:
     wrong = run("cancel", "0xABC", "--execute", "--confirm", "deadbeef00")
     assert wrong.returncode == 2
     assert json.loads(wrong.stdout)["mode"] == "blocked"
+    # `--all` binds to the live open-order snapshot (needs the client); that is
+    # covered by test_cancel_all_token_binds_to_open_order_snapshot.
 
-    # `--all` is bound to a distinct token from a specific order id.
-    all_token = json.loads(run("cancel", "--all").stdout)["confirm_token"]
-    assert all_token != dry["confirm_token"]
+
+def test_cancel_all_token_binds_to_open_order_snapshot(monkeypatch, tmp_path, capsys) -> None:
+    """`cancel --all` binds its token to the live open-order ids, so a stale token
+    from a different snapshot cannot wipe orders the operator never previewed."""
+    import types
+
+    import trade as trade_mod
+
+    def fake_clob(order_ids):
+        class _Adapter:
+            def __init__(self, creds):
+                pass
+
+            def list_orders(self):
+                return [{"id": oid} for oid in order_ids]
+
+            def cancel_all(self):
+                return {"canceled": sorted(order_ids)}
+
+        return types.SimpleNamespace(ClobAdapter=_Adapter, ClobError=Exception)
+
+    def cancel_args(**kw):
+        base = dict(
+            all=True,
+            order_id=None,
+            execute=False,
+            confirm=None,
+            credentials_file=str(tmp_path / "absent"),
+        )
+        base.update(kw)
+        return types.SimpleNamespace(**base)
+
+    # Snapshot {a, b}: the dry-run previews the sorted ids and a bound token.
+    monkeypatch.setitem(sys.modules, "clob", fake_clob(["b", "a"]))
+    assert trade_mod._cmd_cancel(cancel_args()) == 0
+    out_ab = json.loads(capsys.readouterr().out)
+    assert out_ab["mode"] == "dry-run"
+    assert out_ab["open_order_ids"] == ["a", "b"]
+    token_ab = out_ab["confirm_token"]
+
+    # A different snapshot {a, b, c} yields a different token.
+    monkeypatch.setitem(sys.modules, "clob", fake_clob(["a", "b", "c"]))
+    assert trade_mod._cmd_cancel(cancel_args()) == 0
+    token_abc = json.loads(capsys.readouterr().out)["confirm_token"]
+    assert token_ab != token_abc
+
+    # The stale {a,b} token cannot execute against the {a,b,c} snapshot.
+    assert trade_mod._cmd_cancel(cancel_args(execute=True, confirm=token_ab)) == 2
+    assert json.loads(capsys.readouterr().out)["mode"] == "blocked"
+
+    # The matching token executes.
+    assert trade_mod._cmd_cancel(cancel_args(execute=True, confirm=token_abc)) == 0
+    assert json.loads(capsys.readouterr().out)["mode"] == "executed"
 
 
 def test_malformed_chain_id_raises_clean_error(tmp_path, monkeypatch) -> None:
