@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Polymarket prediction-market query and official CLOB API trading Agent Skills.",
-    "version": "0.2.0"
+    "version": "0.2.1"
   },
   "plugins": [
     {
       "name": "holo-polymarket",
       "source": "./plugins/holo-polymarket",
       "description": "Query Polymarket prediction markets and trade via the official CLOB API.",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "author": {
         "name": "holo"
       },

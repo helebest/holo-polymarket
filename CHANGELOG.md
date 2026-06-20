@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here.
 
+## 0.2.1
+
+### Changed
+
+- `polymarket-trade`: `cancel --all` now binds its confirmation token to a
+  snapshot of the currently-open order ids (listed live and shown in the dry-run
+  preview) instead of a constant. A stale `--all` token from an earlier session
+  can no longer cancel orders placed since the preview — the snapshot is
+  recomputed on execute and a changed set produces a different token. Previewing
+  `--all` therefore now needs API credentials; a single-order `cancel <id>` is
+  unchanged and still works offline.
+
 ## 0.2.0
 
 ### Added
