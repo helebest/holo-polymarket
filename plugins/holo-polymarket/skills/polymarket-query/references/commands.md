@@ -7,6 +7,7 @@
 3. Historical trends and export
 4. Cache and environment variables
 5. Official trading CLI
+6. Reading the output
 
 ## 1. Market queries
 
@@ -24,9 +25,12 @@ bash <skill-dir>/scripts/polymarket.sh detail <event-slug>
 ## 2. Whale tracking
 
 ```bash
-# Leaderboard (alias lb)
+# Leaderboard (alias lb). Positional: [limit] [order] [period].
 bash <skill-dir>/scripts/polymarket.sh leaderboard [limit] [pnl|vol] [day|week|month|all]
 bash <skill-dir>/scripts/polymarket.sh lb 10 pnl week
+# Or lead with -t|--time <period> to set the window first: -t <period> [limit] [order]
+bash <skill-dir>/scripts/polymarket.sh lb --time week 10 pnl
+# order accepts pnl|vol (or "volume"); period accepts day|week|month|all (or d|w|m|a)
 
 # Positions (alias pos)
 bash <skill-dir>/scripts/polymarket.sh positions <wallet-address> [limit]
@@ -101,3 +105,17 @@ python3 <skill-dir>/../polymarket-trade/scripts/trade.py buy <MARKET_SLUG> yes -
 python3 <skill-dir>/../polymarket-trade/scripts/trade.py orders
 python3 <skill-dir>/../polymarket-trade/scripts/trade.py cancel <ORDER_ID>
 ```
+
+## 6. Reading the output
+
+Commands print human-readable text (a header plus rows), not JSON, and exit `0`
+on success — **including a valid empty result**. Distinguish the three states:
+
+- **Data (exit 0):** a header then rows, e.g. `🔥 Polymarket hot markets (Top 3)`,
+  `📊 Positions: 0xabc…`, or `🏆 Polymarket leaderboard (by P&L, WEEK, Top 10)`.
+- **Valid-but-empty (exit 0):** `No positions`, `No trades`, `No data`, or
+  `Event not found: <slug>`. An empty `positions` / `trades` for an address you
+  expect to hold value usually means you queried the signer **EOA** instead of the
+  **proxy wallet** — see [troubleshooting.md](troubleshooting.md), not a bug.
+- **Error (non-zero exit):** a line on stderr prefixed `Error:` (e.g. a missing
+  `curl` / `jq`) or `Request failed: …` (network/API). These are real failures.

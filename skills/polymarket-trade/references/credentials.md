@@ -1,5 +1,15 @@
 # Credentials
 
+## Contents
+
+1. Which keys each workflow needs
+2. File format
+3. Recognised keys and aliases
+4. Lookup order
+5. Security
+6. What each credential is for
+7. Obtaining credentials
+
 `polymarket-trade` (and the optional historical-price auth in `polymarket-query`)
 read credentials from a gitignored `KEY=VALUE` file or `POLYMARKET_*` environment
 variables. This page is the single reference for which keys exist, what each one
